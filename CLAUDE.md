@@ -48,10 +48,33 @@ checkin-industrial-painel/
 | Env var | Default | O que faz |
 |---|---|---|
 | `VITE_API_BASE` | `""` (vazio) | URL base da API. **Em dev**: deixe vazio — o Vite proxy redireciona `/api` e `/uploads` pra `VITE_DEV_PROXY_TARGET`. **Em prod**: defina pra URL absoluta do backend (ex: `https://api.senailp.com.br/turismoindustrial_api`). Aplicado em build time. |
-| `VITE_API_KEY` | (vazio) | API Key opcional. Quando definida, o `apiClient.apiFetch` adiciona o header `X-Api-Key` em requisicoes nao-GET (POST/PUT/DELETE/PATCH). Reads sao publicos, nao precisam. |
 | `VITE_DEV_PROXY_TARGET` | URL de prod | So usado em `npm run dev`. Aponta pra http://localhost:8080 pra falar com docker-compose local. |
 
 Em prod, sobrescrever via `.env.production` ou env vars do CI/host de deploy.
+
+> A antiga `VITE_API_KEY` (chave admin embutida no bundle em build-time) foi removida. A chave agora eh coletada em runtime via `LoginModal` (ver "Auth admin" abaixo).
+
+## Auth admin
+
+A API protege endpoints de escrita (POST/PUT/DELETE/Upload/Import/Geocode) com o header `X-Api-Key`. A chave **nao** fica no bundle - cada admin autorizado recebe a chave fora-de-banda (e-mail, Slack, etc.) e a digita ao tentar abrir uma tela de gestao.
+
+**Fluxo:**
+
+1. Visitante navega normalmente (mapa, cards publicos) sem autenticacao.
+2. Ao clicar em qualquer item do submenu **Gestão** (Empresas, Pontos, Telefones), `App.tsx` intercepta a navegacao e abre o `LoginModal` (em vez de mudar de tab).
+3. Usuario digita a chave; o handler valida tocando `DELETE /api/empresas/{guid-impossivel}`:
+   - **401**: chave invalida → mostra erro inline, mantem o input pra correcao.
+   - **404** (ou qualquer outro nao-401): chave valida (endpoint passou auth, so nao achou o registro) → salva em `sessionStorage` e abre a tela de gestao desejada.
+4. Em qualquer 401 durante uso (escrita real que falha), `apiFetch` chama `notifyUnauthorized()`, que limpa o storage e dispara `auth:unauthorized`. O `AuthProvider` escuta esse evento e zera o estado; o `App.tsx` redireciona pro mapa.
+5. Botao **Sair** no submenu Gestao (visivel so quando autenticado) chama `logout()`.
+
+**Persistencia:** `sessionStorage` (some ao fechar a aba). Escolha consciente de seguranca - cada nova aba/janela exige login novo.
+
+**Arquivos principais:**
+
+- `src/shared/auth/AuthContext.tsx` - Provider, `useAuth()` hook, helpers standalone (`getStoredApiKey`, `notifyUnauthorized`) usados pelo `apiFetch`.
+- `src/shared/auth/LoginModal.tsx` - UI do login.
+- `src/shared/api/apiClient.ts` - le a chave do storage e injeta `X-Api-Key` em writes; dispara `notifyUnauthorized()` em 401.
 
 ## Como adicionar uma feature
 
