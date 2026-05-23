@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { apiUrl } from "../apiClient";
+import { apiUrl } from "../../shared/api/apiClient";
 
 type EmpresaListItem = {
   id: string;

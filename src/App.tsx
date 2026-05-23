@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
-import { EmpresasFilterMapExample } from "./components/EmpresasFilterMapExample";
-import { EmpresasManagementScreen } from "./components/EmpresasManagementScreen";
-import { PontosInstitucionaisManagementScreen } from "./components/PontosInstitucionaisManagementScreen";
-import { PontosInstitucionaisCardsScreen } from "./components/PontosInstitucionaisCardsScreen";
-import { TelefonesUteisCardsScreen } from "./components/TelefonesUteisCardsScreen";
-import { TelefonesUteisManagementScreen } from "./components/TelefonesUteisManagementScreen";
+import { EmpresasFilterMapExample } from "./features/empresas/EmpresasFilterMapExample";
+import { EmpresasManagementScreen } from "./features/empresas/EmpresasManagementScreen";
+import { PontosInstitucionaisManagementScreen } from "./features/pontosInstitucionais/PontosInstitucionaisManagementScreen";
+import { PontosInstitucionaisCardsScreen } from "./features/pontosInstitucionais/PontosInstitucionaisCardsScreen";
+import { TelefonesUteisCardsScreen } from "./features/telefonesUteis/TelefonesUteisCardsScreen";
+import { TelefonesUteisManagementScreen } from "./features/telefonesUteis/TelefonesUteisManagementScreen";
 import logo from "./imagens/logo.png";
 
 type DashboardTab = "mapa" | "gestao" | "gestao-pontos" | "cards-pontos" | "cards-telefones" | "gestao-telefones";

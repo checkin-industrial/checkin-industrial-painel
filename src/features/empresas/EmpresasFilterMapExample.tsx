@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { apiUrl, staticUrl } from "../apiClient";
+import { apiUrl, staticUrl } from "../../shared/api/apiClient";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import { createEmpresaMarkerIcon } from "./EmpresaMarker";
-import { useDraggable } from "../hooks/useDraggable";
+import { useDraggable } from "../../shared/hooks/useDraggable";
 
 type EmpresaFilterMapItem = {
   id: string;
@@ -344,7 +344,7 @@ function createPontoInstitucionalMarkerIcon(
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/\"/g, "&quot;")
+    .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
   const labelHtml = showLabel && safeNome
     ? `<span class="ponto-institucional-marker__label" title="${safeNome}">${safeNome}</span>`
