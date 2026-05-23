@@ -5,9 +5,17 @@ import { PontosInstitucionaisManagementScreen } from "./features/pontosInstituci
 import { PontosInstitucionaisCardsScreen } from "./features/pontosInstitucionais/PontosInstitucionaisCardsScreen";
 import { TelefonesUteisCardsScreen } from "./features/telefonesUteis/TelefonesUteisCardsScreen";
 import { TelefonesUteisManagementScreen } from "./features/telefonesUteis/TelefonesUteisManagementScreen";
+import { useAuth } from "./shared/auth/AuthContext";
+import { LoginModal } from "./shared/auth/LoginModal";
 import logo from "./imagens/logo.png";
 
 type DashboardTab = "mapa" | "gestao" | "gestao-pontos" | "cards-pontos" | "cards-telefones" | "gestao-telefones";
+
+const ADMIN_TABS: DashboardTab[] = ["gestao", "gestao-pontos", "gestao-telefones"];
+
+function isAdminTab(tab: DashboardTab): boolean {
+  return ADMIN_TABS.includes(tab);
+}
 
 type MapTargetPoint = {
   id: string;
@@ -18,16 +26,26 @@ type MapTargetPoint = {
 };
 
 export function App() {
+  const { isAuthenticated, logout } = useAuth();
   const [activeTab, setActiveTab] = useState<DashboardTab>("mapa");
   const [mapTargetPoint, setMapTargetPoint] = useState<MapTargetPoint | null>(null);
   const [isGestaoMenuOpen, setIsGestaoMenuOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  // Quando o usuario clica numa tab admin sem estar autenticado, guardamos
+  // o destino aqui e abrimos o modal de login. Sucesso -> navega; cancela -> descarta.
+  const [pendingAdminTab, setPendingAdminTab] = useState<DashboardTab | null>(null);
   const gestaoMenuRef = useRef<HTMLDivElement | null>(null);
   const navigationRef = useRef<HTMLElement | null>(null);
 
-  const isGestaoTabAtiva = activeTab === "gestao"
-    || activeTab === "gestao-pontos"
-    || activeTab === "gestao-telefones";
+  const isGestaoTabAtiva = isAdminTab(activeTab);
+
+  // Se a sessao expirar (401 em qualquer endpoint) enquanto o usuario esta numa
+  // tab admin, redireciona pro mapa para evitar tela quebrada.
+  useEffect(() => {
+    if (!isAuthenticated && isAdminTab(activeTab)) {
+      setActiveTab("mapa");
+    }
+  }, [isAuthenticated, activeTab]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -45,7 +63,28 @@ export function App() {
   }, []);
 
   function handleNavigate(tab: DashboardTab) {
+    // Intercepta navegacao admin: se nao autenticado, abre modal e segura o destino.
+    if (isAdminTab(tab) && !isAuthenticated) {
+      setPendingAdminTab(tab);
+      setIsGestaoMenuOpen(false);
+      setIsMobileMenuOpen(false);
+      return;
+    }
     setActiveTab(tab);
+    setIsGestaoMenuOpen(false);
+    setIsMobileMenuOpen(false);
+  }
+
+  function handleLoginSuccess() {
+    if (pendingAdminTab) {
+      setActiveTab(pendingAdminTab);
+    }
+    setPendingAdminTab(null);
+  }
+
+  function handleLogout() {
+    logout();
+    setActiveTab("mapa");
     setIsGestaoMenuOpen(false);
     setIsMobileMenuOpen(false);
   }
@@ -148,6 +187,17 @@ export function App() {
                 >
                   Gestão Telefones Úteis
                 </button>
+                {isAuthenticated && (
+                  <button
+                    type="button"
+                    className="top-submenu-link"
+                    role="menuitem"
+                    onClick={handleLogout}
+                    style={{ borderTop: "1px solid rgba(255,255,255,0.15)", marginTop: 4, color: "#fca5a5" }}
+                  >
+                    Sair
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -162,6 +212,12 @@ export function App() {
         {activeTab === "cards-telefones" && <TelefonesUteisCardsScreen />}
         {activeTab === "gestao-telefones" && <TelefonesUteisManagementScreen />}
       </main>
+
+      <LoginModal
+        isOpen={pendingAdminTab !== null}
+        onClose={() => setPendingAdminTab(null)}
+        onSuccess={handleLoginSuccess}
+      />
     </div>
   );
 }

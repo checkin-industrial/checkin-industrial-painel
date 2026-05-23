@@ -8,12 +8,17 @@
  *   Em prod (`npm run build`): defina via `.env.production` ou variavel de ambiente
  *   de build (ex: `VITE_API_BASE=https://api.exemplo.com npm run build`).
  *
- * - `VITE_API_KEY`: API Key opcional para endpoints de escrita
- *   (Create/Update/Delete/Import/Upload/Geocode). Vai no header `X-Api-Key`.
- *   Reads (List/Get/Filter/Heatmap) sao publicos, dispensam o header.
+ * Autorizacao admin:
+ * Endpoints de escrita (POST/PUT/DELETE/PATCH) recebem o header `X-Api-Key`
+ * automaticamente. A chave vem do sessionStorage (gerenciada por `AuthContext`).
+ * Sem chave logada, escritas retornam 401 e o evento `auth:unauthorized` e
+ * disparado para o AuthProvider reabrir o login.
+ *
+ * Reads (GET) sao publicos e nao precisam de chave.
  */
+import { getStoredApiKey, notifyUnauthorized } from "../auth/AuthContext";
+
 export const API_BASE: string = (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
-const API_KEY: string | undefined = import.meta.env.VITE_API_KEY as string | undefined;
 
 /**
  * Prefixa o path com a URL base da API.
@@ -65,11 +70,20 @@ export async function apiFetch<T = unknown>(
     finalBody = JSON.stringify(body);
   }
 
-  if (API_KEY && method !== "GET" && method !== "HEAD") {
-    headers.set("X-Api-Key", API_KEY);
+  if (method !== "GET" && method !== "HEAD") {
+    const sessionKey = getStoredApiKey();
+    if (sessionKey) {
+      headers.set("X-Api-Key", sessionKey);
+    }
   }
 
   const response = await fetch(apiUrl(path), { method, headers, body: finalBody, ...rest });
+
+  // 401 em qualquer endpoint: limpa a chave armazenada e notifica o AuthProvider
+  // (que vai forcar re-login da proxima vez que o usuario acessar uma area admin).
+  if (response.status === 401) {
+    notifyUnauthorized();
+  }
 
   if (!response.ok) {
     // Le o body (JSON ou texto) pra preservar a mensagem da API.
