@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { apiFetch, staticUrl } from "../../shared/api/apiClient";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl } from "react-leaflet";
@@ -263,11 +264,8 @@ function matchesPontoInstitucionalFilters(
 export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapExampleProps) {
   const [filters, setFilters] = useState<FilterFormState>(INITIAL_FILTERS);
   const [pontoFilters, setPontoFilters] = useState<PontoInstitucionalFilterState>(INITIAL_PONTO_FILTERS);
-  const [empresas, setEmpresas] = useState<EmpresaFilterMapItem[]>([]);
   const [cnaeOptions, setCnaeOptions] = useState<CnaeOption[]>([{ value: "", label: "Todos" }]);
   const [municipioOptions, setMunicipioOptions] = useState<string[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [filtersCollapsed, setFiltersCollapsed] = useState(true);
   const [empresaFiltersCollapsed, setEmpresaFiltersCollapsed] = useState(false);
   const [pontosFiltersCollapsed, setPontosFiltersCollapsed] = useState(false);
@@ -283,11 +281,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
   const [layerToggles, setLayerToggles] = useState<LayerToggleState>(INITIAL_LAYER_TOGGLES);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [selectedEmpresaId, setSelectedEmpresaId] = useState<string | null>(null);
-  const [vizinhanca, setVizinhanca] = useState<EmpresaVizinhancaResponse | null>(null);
-  const [reportLoading, setReportLoading] = useState(false);
-  const [reportError, setReportError] = useState<string | null>(null);
-  const [heatmapPoints, setHeatmapPoints] = useState<HeatmapPointTuple[]>([]);
-  const [pontosInstitucionais, setPontosInstitucionais] = useState<PontoInstitucionalMapItem[]>([]);
   const [selectedPontoInstitucionalId, setSelectedPontoInstitucionalId] = useState<string | null>(null);
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [locationActive, setLocationActive] = useState(false);
@@ -305,97 +298,77 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
   const mapStageRef = useRef<HTMLDivElement | null>(null);
   const lastMapTargetRequestRef = useRef<number | null>(null);
 
-  async function fetchEmpresas(currentFilters: FilterFormState) {
-    setLoading(true);
-    setError(null);
+  const effectiveFilters = empresaBuscaAtiva ? filters : INITIAL_FILTERS;
+  const pontosTipoEfetivo = pontosBuscaAtiva ? pontoFilters.tipo : "";
 
-    try {
-      const queryString = buildQueryString(currentFilters);
+  const {
+    data: empresas = [],
+    isFetching: loading,
+    error: empresasQueryError,
+  } = useQuery({
+    queryKey: ["empresas", "filter", effectiveFilters],
+    queryFn: async () => {
+      const queryString = buildQueryString(effectiveFilters);
       const endpoint = queryString ? `/api/empresas/filter?${queryString}` : "/api/empresas/filter";
-
       const data = await apiFetch<EmpresaFilterMapItem[]>("GET", endpoint);
-      const empresasFiltradas = Array.isArray(data) ? data : [];
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
-      setEmpresas(empresasFiltradas);
+  const error = empresasQueryError instanceof Error ? empresasQueryError.message : null;
 
-      if (!hasActiveFilters(currentFilters) && empresasFiltradas.length > 0) {
-        setCnaeOptions(buildCnaeOptions(empresasFiltradas));
-        setMunicipioOptions(buildMunicipioOptions(empresasFiltradas));
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao buscar empresas filtradas.");
-      setEmpresas([]);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const [heatmapLoading, setHeatmapLoading] = useState(false);
-
-  async function fetchHeatmap(currentFilters: FilterFormState) {
-    setHeatmapLoading(true);
-    try {
+  const {
+    data: heatmapPoints = [],
+    isFetching: heatmapLoading,
+  } = useQuery({
+    queryKey: ["empresas", "heatmap", effectiveFilters.cnae.trim(), effectiveFilters.setor.trim()],
+    queryFn: async () => {
       const params = new URLSearchParams();
-      const cnae = currentFilters.cnae.trim();
-      const setor = currentFilters.setor.trim();
-
-      if (cnae) {
-        params.set("cnae", cnae);
-      }
-
-      if (setor) {
-        params.set("setor", setor);
-      }
-
+      const cnae = effectiveFilters.cnae.trim();
+      const setor = effectiveFilters.setor.trim();
+      if (cnae) params.set("cnae", cnae);
+      if (setor) params.set("setor", setor);
       const endpoint = params.toString() ? `/api/analytics/heatmap?${params.toString()}` : "/api/analytics/heatmap";
-
-      let data: HeatmapPointApi[];
       try {
-        data = await apiFetch<HeatmapPointApi[]>("GET", endpoint);
+        const data = await apiFetch<HeatmapPointApi[]>("GET", endpoint);
+        return (Array.isArray(data) ? data : [])
+          .filter((point) => isCoordinateInsideViewportWindow(point.latitude, point.longitude))
+          .map((point) => [point.latitude, point.longitude, Math.max(1, point.peso)] as HeatmapPointTuple);
       } catch {
-        setHeatmapPoints([]);
-        return;
+        return [] as HeatmapPointTuple[];
       }
-      const points = (Array.isArray(data) ? data : [])
-        .filter((point) => isCoordinateInsideViewportWindow(point.latitude, point.longitude))
-        .map((point) => [point.latitude, point.longitude, Math.max(1, point.peso)] as HeatmapPointTuple);
+    },
+    enabled: layerToggles.heatmap,
+  });
 
-      setHeatmapPoints(points);
-    } catch {
-      setHeatmapPoints([]);
-    } finally {
-      setHeatmapLoading(false);
-    }
-  }
-
-  async function fetchPontosInstitucionais(tipo = "") {
-    try {
+  const {
+    data: pontosInstitucionais = [],
+  } = useQuery({
+    queryKey: ["pontos-institucionais", "mapa", pontosTipoEfetivo.trim().toLowerCase()],
+    queryFn: async () => {
       const params = new URLSearchParams();
       params.set("ativo", "true");
-
-      const tipoNormalizado = tipo.trim().toLowerCase();
-      if (tipoNormalizado) {
-        params.set("tipo", tipoNormalizado);
-      }
-
-      let data: PontoInstitucionalMapItem[];
+      const tipoNormalizado = pontosTipoEfetivo.trim().toLowerCase();
+      if (tipoNormalizado) params.set("tipo", tipoNormalizado);
       try {
-        data = await apiFetch<PontoInstitucionalMapItem[]>(
+        const data = await apiFetch<PontoInstitucionalMapItem[]>(
           "GET",
           `/api/pontos-institucionais?${params.toString()}`,
         );
+        return (Array.isArray(data) ? data : [])
+          .sort((left, right) => left.ordemExibicao - right.ordemExibicao);
       } catch {
-        setPontosInstitucionais([]);
-        return;
+        return [] as PontoInstitucionalMapItem[];
       }
-      const pontos = (Array.isArray(data) ? data : [])
-        .sort((left, right) => left.ordemExibicao - right.ordemExibicao);
+    },
+  });
 
-      setPontosInstitucionais(pontos);
-    } catch {
-      setPontosInstitucionais([]);
+  useEffect(() => {
+    if (!hasActiveFilters(effectiveFilters) && empresas.length > 0) {
+      setCnaeOptions(buildCnaeOptions(empresas));
+      setMunicipioOptions(buildMunicipioOptions(empresas));
     }
-  }
+  }, [empresas, effectiveFilters]);
 
   function requestUserLocation() {
     if (!navigator.geolocation) {
@@ -452,33 +425,8 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
   }
 
   useEffect(() => {
-    fetchEmpresas(INITIAL_FILTERS);
-  }, []);
-
-  useEffect(() => {
-    fetchPontosInstitucionais(pontosBuscaAtiva ? pontoFilters.tipo : "");
-  }, [pontoFilters.tipo, pontosBuscaAtiva]);
-
-  useEffect(() => {
-    if (!layerToggles.heatmap) {
-      setHeatmapPoints([]);
-      return;
-    }
-
-    fetchHeatmap(empresaBuscaAtiva ? filters : INITIAL_FILTERS);
-  }, [empresaBuscaAtiva, filters, layerToggles.heatmap]);
-
-  useEffect(() => {
-    if (!selectedEmpresaId) {
-      setVizinhanca(null);
-      setReportError(null);
-      return;
-    }
-
-    if (!empresas.some((empresa) => empresa.id === selectedEmpresaId)) {
+    if (selectedEmpresaId && !empresas.some((empresa) => empresa.id === selectedEmpresaId)) {
       setSelectedEmpresaId(null);
-      setVizinhanca(null);
-      setReportError(null);
     }
   }, [empresas, selectedEmpresaId]);
 
@@ -522,50 +470,30 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
     setPontosBuscaAtiva(true);
     setLayerToggles((prev) => ({ ...prev, pontosInstitucionais: true }));
     setSelectedEmpresaId(null);
-    setVizinhanca(null);
     setSelectedPontoInstitucionalId(mapTargetPoint.id);
     setReportCollapsed(false);
     setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
     setMapFocusTarget([mapTargetPoint.latitude, mapTargetPoint.longitude]);
   }, [mapTargetPoint]);
 
-  useEffect(() => {
-    if (!selectedEmpresaId) {
-      return;
-    }
+  const {
+    data: vizinhanca = null,
+    isFetching: reportLoading,
+    error: vizinhancaQueryError,
+  } = useQuery({
+    queryKey: ["empresas", selectedEmpresaId, "neighbors"],
+    queryFn: () =>
+      apiFetch<EmpresaVizinhancaResponse>(
+        "GET",
+        `/api/empresas/${selectedEmpresaId}/neighbors?radius=5000&limit=20`,
+      ),
+    enabled: !!selectedEmpresaId,
+  });
 
-    let cancelled = false;
-
-    async function fetchVizinhanca() {
-      setReportLoading(true);
-      setReportError(null);
-
-      try {
-        const data = await apiFetch<EmpresaVizinhancaResponse>(
-          "GET",
-          `/api/empresas/${selectedEmpresaId}/neighbors?radius=5000&limit=20`,
-        );
-        if (!cancelled) {
-          setVizinhanca(data);
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setVizinhanca(null);
-          setReportError(err instanceof Error ? err.message : "Erro ao carregar vizinhança.");
-        }
-      } finally {
-        if (!cancelled) {
-          setReportLoading(false);
-        }
-      }
-    }
-
-    fetchVizinhanca();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [selectedEmpresaId]);
+  const reportError =
+    selectedEmpresaId && vizinhancaQueryError instanceof Error
+      ? vizinhancaQueryError.message
+      : null;
 
   useEffect(() => {
     function handleFullscreenChange() {
@@ -596,23 +524,16 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
     setPontoFilters(INITIAL_PONTO_FILTERS);
     setSelectedEmpresaId(null);
     setSelectedPontoInstitucionalId(null);
-    setVizinhanca(null);
-    setReportError(null);
     setEmpresaBuscaAtiva(true);
     setPontosBuscaAtiva(true);
     setEmpresaFiltersVisible(true);
     setPontosFiltersVisible(true);
     setEmpresaFiltersCollapsed(false);
     setPontosFiltersCollapsed(false);
-    fetchEmpresas(INITIAL_FILTERS);
-    setHeatmapPoints([]);
   }
 
   function handleFilterChange(field: keyof FilterFormState, value: string) {
-    const nextFilters = { ...filters, [field]: value };
-    setFilters(nextFilters);
-    fetchEmpresas(empresaBuscaAtiva ? nextFilters : INITIAL_FILTERS);
-    setHeatmapPoints([]);
+    setFilters((current) => ({ ...current, [field]: value }));
   }
 
   function handlePontoFilterChange(field: keyof PontoInstitucionalFilterState, value: string) {
@@ -620,10 +541,7 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
   }
 
   function toggleEmpresaBusca() {
-    const next = !empresaBuscaAtiva;
-    setEmpresaBuscaAtiva(next);
-    fetchEmpresas(next ? filters : INITIAL_FILTERS);
-    setHeatmapPoints([]);
+    setEmpresaBuscaAtiva((prev) => !prev);
   }
 
   function togglePontosBusca() {
@@ -1391,8 +1309,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
                         }
 
                         setSelectedEmpresaId(null);
-                        setVizinhanca(null);
-                        setReportError(null);
                         return;
                       }
 
@@ -1426,7 +1342,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
                     click: () => {
                       setSelectedPontoInstitucionalId(ponto.id);
                       setSelectedEmpresaId(null);
-                      setVizinhanca(null);
                       setReportCollapsed(false);
                       setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
                     },
