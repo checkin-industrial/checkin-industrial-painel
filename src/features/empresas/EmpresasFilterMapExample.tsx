@@ -1,11 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { apiUrl, staticUrl } from "../../shared/api/apiClient";
 import L from "leaflet";
-import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl, useMap } from "react-leaflet";
+import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import { createEmpresaMarkerIcon } from "./EmpresaMarker";
 import { useDraggable } from "../../shared/hooks/useDraggable";
+import {
+  DEFAULT_CENTER,
+  DEFAULT_ZOOM,
+  HeatmapLayer,
+  type HeatmapPointTuple,
+  isCoordinateInsideViewportWindow,
+  type LatLngTuple,
+  MapFocusTarget,
+  MapViewport,
+} from "./MapHelpers";
+import {
+  createPontoInstitucionalMarkerIcon,
+  getPontoInstitucionalColor,
+  getPontoInstitucionalTipoBadgeClass,
+  getPontoInstitucionalTipoIcon,
+  getPontoInstitucionalTipoIconClass,
+  getPontoInstitucionalTipoLabel,
+  normalizeTipoPonto,
+  type PontoInstitucionalMapItem,
+} from "../pontosInstitucionais/markerHelpers";
 
 type EmpresaFilterMapItem = {
   id: string;
@@ -50,26 +70,8 @@ type EmpresaVizinhancaResponse = {
   empresasProximas: EmpresaVizinha[];
 };
 
-type PontoInstitucionalMapItem = {
-  id: string;
-  nome: string;
-  tipo: string;
-  descricao: string;
-  endereco: string;
-  latitude: number;
-  longitude: number;
-  atividadesDisponiveis: string;
-  equipeGestao: string;
-  contatoNome: string;
-  contatoTelefone: string;
-  contatoEmail: string;
-  responsavelFotoUrl?: string | null;
-  logoUrl?: string | null;
-  cardFotoUrl?: string | null;
-  corMarcador: string;
-  iconeMarcador: string;
-  ordemExibicao: number;
-};
+// Types movidos pra ../pontosInstitucionais/markerHelpers.ts (PontoInstitucionalMapItem)
+// e ./MapHelpers.tsx (LeafletHeatLayer, HeatmapPointTuple, LatLngTuple) - re-importados acima.
 
 type HeatmapPointApi = {
   latitude: number;
@@ -77,13 +79,6 @@ type HeatmapPointApi = {
   peso: number;
 };
 
-type LeafletHeatLayer = L.Layer & {
-  setOptions: (options: Record<string, unknown>) => void;
-  redraw: () => void;
-};
-
-type HeatmapPointTuple = [number, number, number];
-type LatLngTuple = [number, number];
 
 type MapTargetPoint = {
   id: string;
@@ -162,16 +157,7 @@ const PONTO_INSTITUCIONAL_TIPO_OPTIONS = [
   { value: "ecoturismo", label: "Ecoturismo" },
 ];
 
-const DEFAULT_CENTER: [number, number] = [-22.602177, -48.800792];
-const DEFAULT_ZOOM = 14;
-
-// Janela geografica de seguranca para evitar fitBounds global por dados ruins.
-const MAP_BOUNDS = {
-  minLat: -24.5,
-  maxLat: -21.0,
-  minLng: -50.5,
-  maxLng: -47.0,
-};
+// DEFAULT_CENTER, DEFAULT_ZOOM, MAP_BOUNDS movidos pra ./MapHelpers.tsx - re-importados acima.
 
 const INITIAL_FILTERS: FilterFormState = {
   nomeFantasia: "",
@@ -195,170 +181,11 @@ const INITIAL_LAYER_TOGGLES: LayerToggleState = {
   pontosInstitucionais: true,
 };
 
-function normalizeTipoPonto(tipo: string) {
-  return tipo.trim().toLowerCase();
-}
-
-function getPontoInstitucionalTipoLabel(tipo: string) {
-  switch (normalizeTipoPonto(tipo)) {
-    case "educacao":
-      return "Educação";
-    case "comercio":
-      return "Comércio";
-    case "financeiro":
-      return "Financeiro";
-    case "servico":
-    case "servicos":
-      return "Serviço";
-    case "setor_prefeitura":
-    case "setorprefeitura":
-      return "Setor Prefeitura";
-    case "pontoturistico":
-      return "Ponto Turístico";
-    case "hotel":
-      return "Hotel / Hospedagem";
-    case "ecoturismo":
-      return "Ecoturismo";
-    default:
-      return "Não definido";
-  }
-}
-
-function getPontoInstitucionalTipoBadgeClass(tipo: string) {
-  switch (normalizeTipoPonto(tipo)) {
-    case "educacao":
-      return "tipo-badge educacao";
-    case "comercio":
-      return "tipo-badge comercio";
-    case "financeiro":
-      return "tipo-badge financeiro";
-    case "servico":
-    case "servicos":
-      return "tipo-badge servico";
-    case "setor_prefeitura":
-    case "setorprefeitura":
-      return "tipo-badge setor-prefeitura";
-    case "pontoturistico":
-      return "tipo-badge ponto-turistico";
-    case "hotel":
-      return "tipo-badge hotel";
-    case "ecoturismo":
-      return "tipo-badge ecoturismo";
-    default:
-      return "tipo-badge";
-  }
-}
-
-function getPontoInstitucionalTipoIcon(tipo: string) {
-  switch (normalizeTipoPonto(tipo)) {
-    case "educacao":
-      return "EDU";
-    case "comercio":
-      return "COM";
-    case "financeiro":
-      return "FIN";
-    case "servico":
-    case "servicos":
-      return "SRV";
-    case "setor_prefeitura":
-    case "setorprefeitura":
-      return "GOV";
-    case "pontoturistico":
-      return "TUR";
-    case "hotel":
-      return "HTL";
-    case "ecoturismo":
-      return "ECO";
-    default:
-      return "TIP";
-  }
-}
-
-function getPontoInstitucionalTipoIconClass(tipo: string) {
-  switch (normalizeTipoPonto(tipo)) {
-    case "educacao":
-      return "tipo-badge-icon tipo-badge-icon--educacao";
-    case "comercio":
-      return "tipo-badge-icon tipo-badge-icon--comercio";
-    case "financeiro":
-      return "tipo-badge-icon tipo-badge-icon--financeiro";
-    case "servico":
-    case "servicos":
-      return "tipo-badge-icon tipo-badge-icon--servico";
-    case "setor_prefeitura":
-    case "setorprefeitura":
-      return "tipo-badge-icon tipo-badge-icon--setor-prefeitura";
-    case "pontoturistico":
-      return "tipo-badge-icon tipo-badge-icon--ponto-turistico";
-    case "hotel":
-      return "tipo-badge-icon tipo-badge-icon--hotel";
-    case "ecoturismo":
-      return "tipo-badge-icon tipo-badge-icon--ecoturismo";
-    default:
-      return "tipo-badge-icon";
-  }
-}
-
-function getPontoInstitucionalColor(tipo: string, corMarcador: string) {
-  if (corMarcador?.trim()) {
-    return corMarcador;
-  }
-
-  switch (normalizeTipoPonto(tipo)) {
-    case "educacao":
-      return "#1d4ed8";
-    case "comercio":
-      return "#f59e0b";
-    case "financeiro":
-      return "#16a34a";
-    case "servico":
-    case "servicos":
-      return "#0f766e";
-    case "setor_prefeitura":
-    case "setorprefeitura":
-      return "#b91c1c";
-    case "pontoturistico":
-      return "#ea580c";
-    case "hotel":
-      return "#7c3aed";
-    case "ecoturismo":
-      return "#16a34a";
-    default:
-      return "#334155";
-  }
-}
-
-function createPontoInstitucionalMarkerIcon(
-  ponto: Pick<PontoInstitucionalMapItem, "nome" | "tipo" | "corMarcador">,
-  isSelected = false,
-  showLabel = true,
-) {
-  const markerColor = getPontoInstitucionalColor(ponto.tipo, ponto.corMarcador);
-  const markerClassName = isSelected
-    ? "ponto-institucional-marker selected"
-    : "ponto-institucional-marker";
-  const wrapperClassName = isSelected
-    ? "ponto-institucional-marker-label-wrap selected"
-    : "ponto-institucional-marker-label-wrap";
-  const safeNome = ponto.nome
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
-  const labelHtml = showLabel && safeNome
-    ? `<span class="ponto-institucional-marker__label" title="${safeNome}">${safeNome}</span>`
-    : "";
-  const iconSize: [number, number] = labelHtml ? [190, 44] : [22, 30];
-
-  return L.divIcon({
-    className: "ponto-institucional-marker-wrapper",
-    html: `<div class="${wrapperClassName}">${labelHtml}<div class="${markerClassName}" style="--marker-color:${markerColor}"><span class="ponto-institucional-marker__dot"></span></div></div>`,
-    iconSize,
-    iconAnchor: [11, 30],
-    popupAnchor: [0, -30],
-  });
-}
+// Helpers de PontoInstitucional (normalizeTipoPonto, getPontoInstitucionalTipoLabel,
+// getPontoInstitucionalTipoBadgeClass, getPontoInstitucionalTipoIcon,
+// getPontoInstitucionalTipoIconClass, getPontoInstitucionalColor,
+// createPontoInstitucionalMarkerIcon) movidos para ../pontosInstitucionais/markerHelpers.ts
+// e re-importados no topo do arquivo.
 
 function hasActiveFilters(filters: FilterFormState) {
   return Object.values(filters).some((value) => value.trim() !== "");
@@ -387,138 +214,8 @@ function buildMunicipioOptions(empresas: EmpresaFilterMapItem[]) {
   return uniqueMunicipios.sort((left, right) => left.localeCompare(right));
 }
 
-function isCoordinateInsideViewportWindow(latitude: number, longitude: number) {
-  return Number.isFinite(latitude)
-    && Number.isFinite(longitude)
-    && latitude >= MAP_BOUNDS.minLat
-    && latitude <= MAP_BOUNDS.maxLat
-    && longitude >= MAP_BOUNDS.minLng
-    && longitude <= MAP_BOUNDS.maxLng;
-}
-
-function MapViewport({ empresas, autoFit }: { empresas: EmpresaFilterMapItem[]; autoFit: boolean }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!autoFit) {
-      map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-      return;
-    }
-
-    const validEmpresas = empresas.filter((empresa) => isCoordinateInsideViewportWindow(empresa.latitude, empresa.longitude));
-
-    if (validEmpresas.length === 0) {
-      map.setView(DEFAULT_CENTER, DEFAULT_ZOOM);
-      return;
-    }
-
-    if (validEmpresas.length === 1) {
-      map.setView([validEmpresas[0].latitude, validEmpresas[0].longitude], 14);
-      return;
-    }
-
-    const bounds = validEmpresas.map((empresa) => [empresa.latitude, empresa.longitude] as [number, number]);
-    map.fitBounds(bounds, { padding: [24, 24], maxZoom: 14 });
-  }, [autoFit, empresas, map]);
-
-  return null;
-}
-
-function MapFocusTarget({ target }: { target: LatLngTuple | null }) {
-  const map = useMap();
-
-  useEffect(() => {
-    if (!target) {
-      return;
-    }
-
-    map.flyTo(target, Math.max(map.getZoom(), 16), {
-      animate: true,
-      duration: 0.8,
-    });
-  }, [map, target]);
-
-  return null;
-}
-
-function HeatmapLayer({ points }: { points: HeatmapPointTuple[] }) {
-  const map = useMap();
-  const heatLayerRef = useRef<L.Layer | null>(null);
-  const HEATMAP_MAX_VISIBLE_ZOOM = 15;
-
-  function buildHeatOptionsByZoom(zoom: number) {
-    const clampedZoom = Math.min(18, Math.max(11, zoom));
-    const radius = Math.round(20 + (clampedZoom - 11) * 1.2);
-    const blur = Math.round(16 + (clampedZoom - 11) * 0.9);
-    const intensityMaxZoom = Math.max(15, clampedZoom);
-
-    return {
-      radius,
-      blur,
-      maxZoom: intensityMaxZoom,
-      minOpacity: 0.3,
-      gradient: {
-        0.2: "#0ea5e9",
-        0.4: "#22c55e",
-        0.6: "#facc15",
-        0.8: "#f97316",
-        1.0: "#dc2626",
-      },
-    };
-  }
-
-  useEffect(() => {
-    if (heatLayerRef.current) {
-      map.removeLayer(heatLayerRef.current);
-      heatLayerRef.current = null;
-    }
-
-    if (points.length === 0) {
-      return;
-    }
-
-    const heatFactory = (L as unknown as {
-      heatLayer: (latlngs: HeatmapPointTuple[], options?: Record<string, unknown>) => L.Layer;
-    }).heatLayer;
-
-    const initialOptions = buildHeatOptionsByZoom(map.getZoom());
-    const heatLayer = heatFactory(points, initialOptions) as LeafletHeatLayer;
-
-    const applyZoomHeatOptions = () => {
-      const currentZoom = map.getZoom();
-      const shouldShowHeatmap = currentZoom <= HEATMAP_MAX_VISIBLE_ZOOM;
-
-      if (!shouldShowHeatmap) {
-        if (map.hasLayer(heatLayer)) {
-          map.removeLayer(heatLayer);
-        }
-        return;
-      }
-
-      if (!map.hasLayer(heatLayer)) {
-        heatLayer.addTo(map);
-      }
-
-      const nextOptions = buildHeatOptionsByZoom(currentZoom);
-      heatLayer.setOptions(nextOptions);
-      heatLayer.redraw();
-    };
-
-    applyZoomHeatOptions();
-    heatLayerRef.current = heatLayer;
-    map.on("zoomend", applyZoomHeatOptions);
-
-    return () => {
-      map.off("zoomend", applyZoomHeatOptions);
-      if (heatLayerRef.current) {
-        map.removeLayer(heatLayerRef.current);
-        heatLayerRef.current = null;
-      }
-    };
-  }, [map, points]);
-
-  return null;
-}
+// isCoordinateInsideViewportWindow, MapViewport, MapFocusTarget, HeatmapLayer
+// movidos para ./MapHelpers.tsx e re-importados no topo do arquivo.
 
 function buildQueryString(filters: FilterFormState) {
   const params = new URLSearchParams();
