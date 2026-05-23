@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { apiUrl, staticUrl } from "../../shared/api/apiClient";
+import { apiFetch, staticUrl } from "../../shared/api/apiClient";
 
 type PontoInstitucionalCardItem = {
   id: string;
@@ -81,12 +81,10 @@ export function PontosInstitucionaisCardsScreen({ onRouteToPoint }: PontosInstit
     setError(null);
 
     try {
-      const response = await fetch(apiUrl("/api/pontos-institucionais?ativo=true"));
-      if (!response.ok) {
-        throw new Error(`Falha ao carregar pontos institucionais (${response.status})`);
-      }
-
-      const data: PontoInstitucionalCardItem[] = await response.json();
+      const data = await apiFetch<PontoInstitucionalCardItem[]>(
+        "GET",
+        "/api/pontos-institucionais?ativo=true",
+      );
       const list = Array.isArray(data) ? data : [];
       list.sort((left, right) => (left.ordemExibicao ?? 0) - (right.ordemExibicao ?? 0));
       setPontos(list);

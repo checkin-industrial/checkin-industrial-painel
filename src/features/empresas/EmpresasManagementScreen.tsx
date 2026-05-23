@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { apiUrl } from "../../shared/api/apiClient";
+import { apiFetch } from "../../shared/api/apiClient";
 
 type EmpresaListItem = {
   id: string;
@@ -147,12 +147,7 @@ export function EmpresasManagementScreen() {
     setError(null);
 
     try {
-      const response = await fetch(apiUrl("/api/empresas/filter"));
-      if (!response.ok) {
-        throw new Error(`Falha ao carregar empresas (${response.status})`);
-      }
-
-      const data: EmpresaListItem[] = await response.json();
+      const data = await apiFetch<EmpresaListItem[]>("GET", "/api/empresas/filter");
       setEmpresas(Array.isArray(data) ? data : []);
     } catch (err) {
       setEmpresas([]);
@@ -211,20 +206,8 @@ export function EmpresasManagementScreen() {
       const endpoint = editingId ? `/api/empresas/${editingId}` : "/api/empresas";
       const method = editingId ? "PUT" : "POST";
 
-      const response = await fetch(apiUrl(endpoint), {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null) as { message?: string } | null;
-        const operationLabel = editingId ? "atualizar" : "cadastrar";
-        const reason = body?.message ?? `Falha ao ${operationLabel} empresa (${response.status})`;
-        throw new Error(reason);
-      }
+      // apiFetch ja extrai message do body em respostas !ok (ApiError.message).
+      await apiFetch(method, endpoint, { body: payload });
 
       setFormData(INITIAL_FORM);
       setInitialModalForm(INITIAL_FORM);
@@ -244,12 +227,7 @@ export function EmpresasManagementScreen() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(apiUrl(`/api/empresas/${id}`));
-      if (!response.ok) {
-        throw new Error(`Falha ao buscar empresa para edicao (${response.status})`);
-      }
-
-      const data = await response.json() as EmpresaDetalheResponseRaw;
+      const data = await apiFetch<EmpresaDetalheResponseRaw>("GET", `/api/empresas/${id}`);
       const enderecoResposta = [
         data.endereco,
         data.Endereco,
@@ -337,9 +315,13 @@ export function EmpresasManagementScreen() {
     }
 
     try {
-      const response = await fetch(apiUrl(`/api/empresas/${id}`), { method: "DELETE" });
-      if (!response.ok && response.status !== 404) {
-        throw new Error(`Falha ao excluir empresa (${response.status})`);
+      try {
+        await apiFetch("DELETE", `/api/empresas/${id}`);
+      } catch (err) {
+        // 404 e tolerado: o registro ja nao existe.
+        if (!(err instanceof Error) || !err.message.includes("404")) {
+          throw err;
+        }
       }
 
       setSuccessMessage("Empresa excluída com sucesso.");
@@ -361,25 +343,13 @@ export function EmpresasManagementScreen() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(apiUrl("/api/empresas/geocode"), {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
+      const data = await apiFetch<GeocodeResponse>("POST", "/api/empresas/geocode", {
+        body: {
           endereco,
           municipio: formData.municipio.trim() || null,
           estado: "SP",
-        }),
+        },
       });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null) as { message?: string } | null;
-        const reason = body?.message ?? `Falha ao geocodificar endereço (${response.status})`;
-        throw new Error(reason);
-      }
-
-      const data = await response.json() as GeocodeResponse;
       setFormData((prev) => ({
         ...prev,
         latitude: Number(data.latitude),

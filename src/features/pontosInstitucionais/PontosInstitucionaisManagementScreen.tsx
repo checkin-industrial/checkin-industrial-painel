@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { apiUrl, staticUrl } from "../../shared/api/apiClient";
+import { apiFetch, apiUrl, staticUrl } from "../../shared/api/apiClient";
 
 type PontoInstitucionalListItem = {
   id: string;
@@ -226,12 +226,7 @@ export function PontosInstitucionaisManagementScreen() {
         ? `/api/pontos-institucionais?${queryString}`
         : "/api/pontos-institucionais";
 
-      const response = await fetch(apiUrl(endpoint));
-      if (!response.ok) {
-        throw new Error(`Falha ao carregar pontos institucionais (${response.status})`);
-      }
-
-      const data: PontoInstitucionalListItem[] = await response.json();
+      const data = await apiFetch<PontoInstitucionalListItem[]>("GET", endpoint);
       setPontos(Array.isArray(data) ? data : []);
     } catch (err) {
       setPontos([]);
@@ -295,20 +290,7 @@ export function PontosInstitucionaisManagementScreen() {
       const endpoint = editingId ? `/api/pontos-institucionais/${editingId}` : "/api/pontos-institucionais";
       const method = editingId ? "PUT" : "POST";
 
-      const response = await fetch(apiUrl(endpoint), {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null) as { message?: string } | null;
-        const operationLabel = editingId ? "atualizar" : "cadastrar";
-        const reason = body?.message ?? `Falha ao ${operationLabel} ponto institucional (${response.status})`;
-        throw new Error(reason);
-      }
+      await apiFetch(method, endpoint, { body: payload });
 
       setFormData(INITIAL_FORM);
       setInitialModalForm(INITIAL_FORM);
@@ -328,12 +310,12 @@ export function PontosInstitucionaisManagementScreen() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(apiUrl(`/api/pontos-institucionais/${id}`));
-      if (!response.ok) {
-        throw new Error(`Falha ao buscar ponto institucional para edicao (${response.status})`);
-      }
+      const responseData = await apiFetch<PontoInstitucionalListItem>(
+        "GET",
+        `/api/pontos-institucionais/${id}`,
+      );
 
-      const data = await response.json() as PontoInstitucionalListItem;
+      const data = responseData;
       setEditingId(id);
       const nextFormData: PontoInstitucionalPayload = {
         nome: data.nome ?? "",
@@ -409,17 +391,11 @@ export function PontosInstitucionaisManagementScreen() {
       form.append("file", file);
       form.append("categoria", categoria);
 
-      const response = await fetch(apiUrl("/api/pontos-institucionais/upload-imagem"), {
-        method: "POST",
-        body: form,
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null) as { message?: string } | null;
-        throw new Error(body?.message ?? `Falha ao enviar imagem (${response.status})`);
-      }
-
-      const data = await response.json() as { url: string };
+      const data = await apiFetch<{ url: string }>(
+        "POST",
+        "/api/pontos-institucionais/upload-imagem",
+        { body: form },
+      );
       setFormData((prev) => (
         categoria === "foto"
           ? { ...prev, responsavelFotoUrl: data.url }
@@ -473,9 +449,13 @@ export function PontosInstitucionaisManagementScreen() {
     }
 
     try {
-      const response = await fetch(apiUrl(`/api/pontos-institucionais/${id}`), { method: "DELETE" });
-      if (!response.ok && response.status !== 404) {
-        throw new Error(`Falha ao excluir ponto institucional (${response.status})`);
+      try {
+        await apiFetch("DELETE", `/api/pontos-institucionais/${id}`);
+      } catch (err) {
+        // 404 tolerado: registro ja desativado.
+        if (!(err instanceof Error) || !err.message.includes("404")) {
+          throw err;
+        }
       }
 
       setSuccessMessage("Ponto institucional desativado com sucesso.");
@@ -533,23 +513,13 @@ export function PontosInstitucionaisManagementScreen() {
       const form = new FormData();
       form.append("file", file);
 
-      const response = await fetch(apiUrl("/api/import/pontos-institucionais"), {
-        method: "POST",
-        body: form,
-      });
-
-      const result = await response.json().catch(() => null) as {
+      const result = await apiFetch<{
         totalRecords?: number;
         inserted?: number;
         updated?: number;
         skipped?: number;
         errors?: Array<{ lineNumber?: number; fieldName?: string; message?: string }>;
-        erro?: string;
-      } | null;
-
-      if (!response.ok) {
-        throw new Error(result?.erro ?? `Falha ao importar CSV (${response.status})`);
-      }
+      }>("POST", "/api/import/pontos-institucionais", { body: form });
 
       const total = result?.totalRecords ?? 0;
       const inserted = result?.inserted ?? 0;
@@ -600,18 +570,7 @@ export function PontosInstitucionaisManagementScreen() {
     };
 
     try {
-      const response = await fetch(apiUrl(`/api/pontos-institucionais/${item.id}`), {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Falha ao reativar ponto institucional (${response.status})`);
-      }
-
+      await apiFetch("PUT", `/api/pontos-institucionais/${item.id}`, { body: payload });
       setSuccessMessage("Ponto institucional reativado com sucesso.");
       await loadPontos(statusFiltro);
     } catch (err) {
