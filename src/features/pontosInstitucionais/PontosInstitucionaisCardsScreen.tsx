@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { apiUrl, staticUrl } from "../apiClient";
+import { apiUrl, staticUrl } from "../../shared/api/apiClient";
 
 type PontoInstitucionalCardItem = {
   id: string;

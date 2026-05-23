@@ -1,5 +1,5 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { apiUrl, staticUrl } from "../apiClient";
+import { apiUrl, staticUrl } from "../../shared/api/apiClient";
 
 type PontoInstitucionalListItem = {
   id: string;

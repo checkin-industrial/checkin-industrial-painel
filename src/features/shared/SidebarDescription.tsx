@@ -1,5 +1,5 @@
 import React from "react";
-import "./SidebarDescription.css";
+import "../shared/SidebarDescription.css";
 
 type SidebarDescriptionProps = {
   title: string;
