@@ -76,6 +76,52 @@ A API protege endpoints de escrita (POST/PUT/DELETE/Upload/Import/Geocode) com o
 - `src/shared/auth/LoginModal.tsx` - UI do login.
 - `src/shared/api/apiClient.ts` - le a chave do storage e injeta `X-Api-Key` em writes; dispara `notifyUnauthorized()` em 401.
 
+## Data fetching: TanStack Query
+
+Todas as features de CRUD usam `useQuery` (leitura) + `useQueryClient.invalidateQueries` (apos mutations).
+O pattern abaixo eh o canone do projeto (ver `TelefonesUteisManagementScreen.tsx` como exemplo):
+
+```tsx
+const TELEFONES_QUERY_KEY = "telefones-uteis";
+
+export function TelefonesUteisManagementScreen() {
+  const queryClient = useQueryClient();
+  const [statusFiltro, setStatusFiltro] = useState<"ativos" | "inativos" | "todos">("ativos");
+
+  // 1. useQuery para a lista. Cache compartilhado entre componentes da mesma queryKey.
+  const {
+    data: telefones = [],
+    isLoading: loadingList,
+    error: queryError,
+    refetch: refetchTelefones,
+  } = useQuery({
+    queryKey: [TELEFONES_QUERY_KEY, statusFiltro],
+    queryFn: async () => apiFetch<TelefoneUtilListItem[]>("GET", `/api/telefones-uteis?ativo=${statusFiltro}`),
+  });
+
+  // 2. Apos uma mutation (Create/Update/Delete), invalida a queryKey raiz.
+  //    Todas as variantes (statusFiltro = ativos/inativos/todos) sao refeitas no proximo render.
+  async function handleSubmit(/* ... */) {
+    await apiFetch("POST", "/api/telefones-uteis", { body: payload });
+    await queryClient.invalidateQueries({ queryKey: [TELEFONES_QUERY_KEY] });
+  }
+
+  // 3. Erro da query e mutation podem coexistir; combine na UI:
+  const queryErrorMessage = queryError instanceof Error ? queryError.message : null;
+  // const [error, setError] = useState<string|null>(null); // do mutation
+  // {(error || queryErrorMessage) && <p>{error || queryErrorMessage}</p>}
+}
+```
+
+**Por que `invalidateQueries` em vez de `refetch`?**
+`invalidate` marca a query como stale, o TanStack Query refaz automaticamente em todos os
+componentes que a usam. `refetch` so atualiza no componente atual. Em telas admin com lista
++ detalhe + cards publicos, `invalidate` mantem tudo sincronizado.
+
+**Convencao de queryKey:**
+`[FEATURE_KEY, ...variantes]` - prefixo fixo identifica a feature; variantes (filtros, ids)
+sao extra. `invalidateQueries({ queryKey: [FEATURE_KEY] })` zera todas as variantes.
+
 ## Como adicionar uma feature
 
 1. Crie `src/features/<feature>/`.

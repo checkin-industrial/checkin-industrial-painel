@@ -1,5 +1,8 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { FormEvent, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
+
+const TELEFONES_QUERY_KEY = "telefones-uteis";
 
 type TelefoneUtilListItem = {
   id: string;
@@ -105,10 +108,9 @@ function parseCategoriaValue(categoria: string) {
 }
 
 export function TelefonesUteisManagementScreen() {
-  const [telefones, setTelefones] = useState<TelefoneUtilListItem[]>([]);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"ativos" | "inativos" | "todos">("ativos");
-  const [loadingList, setLoadingList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -125,38 +127,31 @@ export function TelefonesUteisManagementScreen() {
     return JSON.stringify(formData) !== JSON.stringify(initialModalForm);
   }, [formData, initialModalForm, isModalOpen]);
 
-  async function loadTelefones(status: "ativos" | "inativos" | "todos" = statusFiltro) {
-    setLoadingList(true);
-    setError(null);
-
-    try {
+  const {
+    data: telefones = [],
+    isLoading: loadingList,
+    error: queryError,
+    refetch: refetchTelefones,
+  } = useQuery({
+    queryKey: [TELEFONES_QUERY_KEY, statusFiltro],
+    queryFn: async () => {
       const params = new URLSearchParams();
-      if (status === "ativos") {
-        params.set("ativo", "true");
-      }
-
-      if (status === "inativos") {
-        params.set("ativo", "false");
-      }
-
+      if (statusFiltro === "ativos") params.set("ativo", "true");
+      if (statusFiltro === "inativos") params.set("ativo", "false");
       const queryString = params.toString();
-      const endpoint = queryString
-        ? `/api/telefones-uteis?${queryString}`
-        : "/api/telefones-uteis";
-
+      const endpoint = queryString ? `/api/telefones-uteis?${queryString}` : "/api/telefones-uteis";
       const data = await apiFetch<TelefoneUtilListItem[]>("GET", endpoint);
-      setTelefones(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setTelefones([]);
-      setError(err instanceof Error ? err.message : "Erro ao carregar telefones úteis.");
-    } finally {
-      setLoadingList(false);
-    }
-  }
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
-  useEffect(() => {
-    loadTelefones(statusFiltro);
-  }, [statusFiltro]);
+  // Erro da query se sobrepoe ao erro manual (de mutations) - prefere o mais recente.
+  const queryErrorMessage = queryError instanceof Error ? queryError.message : null;
+
+  // Invalida todas as queries da feature: cache zera, useQuery refaz automaticamente.
+  function invalidateTelefones() {
+    return queryClient.invalidateQueries({ queryKey: [TELEFONES_QUERY_KEY] });
+  }
 
   const filteredTelefones = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -201,7 +196,7 @@ export function TelefonesUteisManagementScreen() {
       setEditingId(null);
       setIsModalOpen(false);
       setSuccessMessage(editingId ? "Telefone útil atualizado com sucesso." : "Telefone útil cadastrado com sucesso.");
-      await loadTelefones();
+      await invalidateTelefones();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar telefone útil.");
     } finally {
@@ -276,7 +271,7 @@ export function TelefonesUteisManagementScreen() {
       }
 
       setSuccessMessage("Telefone útil desativado com sucesso.");
-      await loadTelefones(statusFiltro);
+      await invalidateTelefones();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao excluir telefone útil.");
     }
@@ -297,7 +292,7 @@ export function TelefonesUteisManagementScreen() {
     try {
       await apiFetch("PUT", `/api/telefones-uteis/${item.id}`, { body: payload });
       setSuccessMessage("Telefone útil reativado com sucesso.");
-      await loadTelefones(statusFiltro);
+      await invalidateTelefones();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao reativar telefone útil.");
     }
@@ -329,12 +324,12 @@ export function TelefonesUteisManagementScreen() {
           <button type="button" className="btn-with-icon btn-action-new" onClick={handleOpenCreateModal}>
             Novo Telefone
           </button>
-          <button type="button" className="ghost btn-with-icon btn-action-refresh" onClick={() => loadTelefones()} disabled={loadingList}>
+          <button type="button" className="ghost btn-with-icon btn-action-refresh" onClick={() => refetchTelefones()} disabled={loadingList}>
             {loadingList ? "Atualizando..." : "Atualizar"}
           </button>
         </div>
 
-        {error && <p className="status-error">{error}</p>}
+        {(error || queryErrorMessage) && <p className="status-error">{error || queryErrorMessage}</p>}
         {successMessage && <p className="status-info">{successMessage}</p>}
 
         <div className="table-wrapper">

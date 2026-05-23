@@ -1,4 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+const EMPRESAS_QUERY_KEY = "empresas";
 import { apiFetch } from "../../shared/api/apiClient";
 
 type EmpresaListItem = {
@@ -122,9 +125,8 @@ function sanitizeDigits(value: string) {
 }
 
 export function EmpresasManagementScreen() {
-  const [empresas, setEmpresas] = useState<EmpresaListItem[]>([]);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
-  const [loadingList, setLoadingList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -142,24 +144,24 @@ export function EmpresasManagementScreen() {
     return JSON.stringify(formData) !== JSON.stringify(initialModalForm);
   }, [formData, initialModalForm, isModalOpen]);
 
-  async function loadEmpresas() {
-    setLoadingList(true);
-    setError(null);
-
-    try {
+  const {
+    data: empresas = [],
+    isLoading: loadingList,
+    error: queryError,
+    refetch: refetchEmpresas,
+  } = useQuery({
+    queryKey: [EMPRESAS_QUERY_KEY, "list"],
+    queryFn: async () => {
       const data = await apiFetch<EmpresaListItem[]>("GET", "/api/empresas/filter");
-      setEmpresas(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setEmpresas([]);
-      setError(err instanceof Error ? err.message : "Erro ao carregar lista de empresas.");
-    } finally {
-      setLoadingList(false);
-    }
-  }
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
-  useEffect(() => {
-    loadEmpresas();
-  }, []);
+  const queryErrorMessage = queryError instanceof Error ? queryError.message : null;
+
+  function invalidateEmpresas() {
+    return queryClient.invalidateQueries({ queryKey: [EMPRESAS_QUERY_KEY] });
+  }
 
   const filteredEmpresas = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -214,7 +216,7 @@ export function EmpresasManagementScreen() {
       setEditingId(null);
       setIsModalOpen(false);
       setSuccessMessage(editingId ? "Empresa atualizada com sucesso." : "Empresa cadastrada com sucesso.");
-      await loadEmpresas();
+      await invalidateEmpresas();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar empresa.");
     } finally {
@@ -303,6 +305,9 @@ export function EmpresasManagementScreen() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+    // handleRequestCloseModal eh estavel via closure (depende so de isModalDirty/isModalOpen
+    // que ja estao listados). React Hook lint pede pra listar mas geraria re-adds desnecessarios.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isModalDirty, isModalOpen]);
 
   async function handleDelete(id: string) {
@@ -325,7 +330,7 @@ export function EmpresasManagementScreen() {
       }
 
       setSuccessMessage("Empresa excluída com sucesso.");
-      await loadEmpresas();
+      await invalidateEmpresas();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao excluir empresa.");
     }
@@ -383,12 +388,12 @@ export function EmpresasManagementScreen() {
           <button type="button" className="btn-with-icon btn-action-new" onClick={handleOpenCreateModal}>
             Nova Empresa
           </button>
-          <button type="button" className="ghost btn-with-icon btn-action-refresh" onClick={() => loadEmpresas()} disabled={loadingList}>
+          <button type="button" className="ghost btn-with-icon btn-action-refresh" onClick={() => refetchEmpresas()} disabled={loadingList}>
             {loadingList ? "Atualizando..." : "Atualizar"}
           </button>
         </div>
 
-        {error && <p className="status-error">{error}</p>}
+        {(error || queryErrorMessage) && <p className="status-error">{error || queryErrorMessage}</p>}
         {successMessage && <p className="status-info">{successMessage}</p>}
 
         <div className="table-wrapper">

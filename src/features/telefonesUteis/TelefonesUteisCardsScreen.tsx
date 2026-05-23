@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
 
 type TelefoneUtilCardItem = {
@@ -67,45 +68,29 @@ function normalizePhoneHref(telefone: string) {
 }
 
 export function TelefonesUteisCardsScreen() {
-  const [telefones, setTelefones] = useState<TelefoneUtilCardItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function loadTelefones() {
-    setLoading(true);
-    setError(null);
-
-    try {
+  const {
+    data: telefones = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["telefones-uteis", "ativos"],
+    queryFn: async () => {
       const data = await apiFetch<TelefoneUtilCardItem[]>("GET", "/api/telefones-uteis?ativo=true");
-      const list = (Array.isArray(data) ? data : [])
+      return (Array.isArray(data) ? data : [])
         .filter((item) => item.ativo)
         .sort((left, right) => {
           const categoriaDiff = categoriaOrder(left.categoria) - categoriaOrder(right.categoria);
-          if (categoriaDiff !== 0) {
-            return categoriaDiff;
-          }
-
+          if (categoriaDiff !== 0) return categoriaDiff;
           const ordemDiff = (left.ordemExibicao ?? 0) - (right.ordemExibicao ?? 0);
-          if (ordemDiff !== 0) {
-            return ordemDiff;
-          }
-
+          if (ordemDiff !== 0) return ordemDiff;
           return left.nome.localeCompare(right.nome);
         });
+    },
+  });
 
-      setTelefones(list);
-    } catch (err) {
-      setTelefones([]);
-      setError(err instanceof Error ? err.message : "Erro ao carregar telefones úteis.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    loadTelefones();
-  }, []);
+  const error = queryError instanceof Error ? queryError.message : null;
 
   const filteredTelefones = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
