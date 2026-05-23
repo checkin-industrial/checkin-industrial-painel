@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { apiUrl } from "../../shared/api/apiClient";
+import { apiFetch } from "../../shared/api/apiClient";
 
 type TelefoneUtilCardItem = {
   id: string;
@@ -77,12 +77,7 @@ export function TelefonesUteisCardsScreen() {
     setError(null);
 
     try {
-      const response = await fetch(apiUrl("/api/telefones-uteis?ativo=true"));
-      if (!response.ok) {
-        throw new Error(`Falha ao carregar telefones úteis (${response.status})`);
-      }
-
-      const data: TelefoneUtilCardItem[] = await response.json();
+      const data = await apiFetch<TelefoneUtilCardItem[]>("GET", "/api/telefones-uteis?ativo=true");
       const list = (Array.isArray(data) ? data : [])
         .filter((item) => item.ativo)
         .sort((left, right) => {

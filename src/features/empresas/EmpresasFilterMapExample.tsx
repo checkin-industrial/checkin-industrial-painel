@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { apiUrl, staticUrl } from "../../shared/api/apiClient";
+import { apiFetch, staticUrl } from "../../shared/api/apiClient";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
@@ -314,12 +314,7 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
       const queryString = buildQueryString(currentFilters);
       const endpoint = queryString ? `/api/empresas/filter?${queryString}` : "/api/empresas/filter";
 
-      const response = await fetch(apiUrl(endpoint));
-      if (!response.ok) {
-        throw new Error(`Falha ao filtrar empresas (${response.status})`);
-      }
-
-      const data: EmpresaFilterMapItem[] = await response.json();
+      const data = await apiFetch<EmpresaFilterMapItem[]>("GET", endpoint);
       const empresasFiltradas = Array.isArray(data) ? data : [];
 
       setEmpresas(empresasFiltradas);
@@ -354,14 +349,14 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
       }
 
       const endpoint = params.toString() ? `/api/analytics/heatmap?${params.toString()}` : "/api/analytics/heatmap";
-      const response = await fetch(apiUrl(endpoint));
 
-      if (!response.ok) {
+      let data: HeatmapPointApi[];
+      try {
+        data = await apiFetch<HeatmapPointApi[]>("GET", endpoint);
+      } catch {
         setHeatmapPoints([]);
         return;
       }
-
-      const data: HeatmapPointApi[] = await response.json();
       const points = (Array.isArray(data) ? data : [])
         .filter((point) => isCoordinateInsideViewportWindow(point.latitude, point.longitude))
         .map((point) => [point.latitude, point.longitude, Math.max(1, point.peso)] as HeatmapPointTuple);
@@ -384,14 +379,16 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
         params.set("tipo", tipoNormalizado);
       }
 
-      const response = await fetch(apiUrl(`/api/pontos-institucionais?${params.toString()}`));
-
-      if (!response.ok) {
+      let data: PontoInstitucionalMapItem[];
+      try {
+        data = await apiFetch<PontoInstitucionalMapItem[]>(
+          "GET",
+          `/api/pontos-institucionais?${params.toString()}`,
+        );
+      } catch {
         setPontosInstitucionais([]);
         return;
       }
-
-      const data: PontoInstitucionalMapItem[] = await response.json();
       const pontos = (Array.isArray(data) ? data : [])
         .sort((left, right) => left.ordemExibicao - right.ordemExibicao);
 
@@ -545,12 +542,10 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
       setReportError(null);
 
       try {
-        const response = await fetch(apiUrl(`/api/empresas/${selectedEmpresaId}/neighbors?radius=5000&limit=20`));
-        if (!response.ok) {
-          throw new Error(`Falha ao consultar vizinhança (${response.status})`);
-        }
-
-        const data: EmpresaVizinhancaResponse = await response.json();
+        const data = await apiFetch<EmpresaVizinhancaResponse>(
+          "GET",
+          `/api/empresas/${selectedEmpresaId}/neighbors?radius=5000&limit=20`,
+        );
         if (!cancelled) {
           setVizinhanca(data);
         }

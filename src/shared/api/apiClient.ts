@@ -72,7 +72,21 @@ export async function apiFetch<T = unknown>(
   const response = await fetch(apiUrl(path), { method, headers, body: finalBody, ...rest });
 
   if (!response.ok) {
-    throw new ApiError(`HTTP ${response.status} on ${method} ${path}`, response.status);
+    // Le o body (JSON ou texto) pra preservar a mensagem da API.
+    // Convencoes da API: ProblemDetails (RFC 7807) usa `detail`, controllers legados `message`/`erro`.
+    let body: unknown = null;
+    const errorContentType = response.headers.get("content-type") ?? "";
+    try {
+      body = errorContentType.includes("application/json") || errorContentType.includes("problem+json")
+        ? await response.json()
+        : await response.text();
+    } catch {
+      // body fica null se nao for parseable
+    }
+
+    const bodyMessage = extractMessageFromBody(body);
+    const message = bodyMessage ?? `HTTP ${response.status} on ${method} ${path}`;
+    throw new ApiError(message, response.status, body);
   }
 
   if (response.status === 204) {
@@ -86,10 +100,26 @@ export async function apiFetch<T = unknown>(
   return (await response.text()) as unknown as T;
 }
 
+function extractMessageFromBody(body: unknown): string | null {
+  if (!body || typeof body !== "object") return null;
+  const obj = body as Record<string, unknown>;
+  if (typeof obj.message === "string") return obj.message;
+  if (typeof obj.erro === "string") return obj.erro;
+  if (typeof obj.detail === "string") return obj.detail;
+  if (typeof obj.title === "string") return obj.title;
+  return null;
+}
+
+/**
+ * Erro tipado lancado pelo apiFetch em respostas !ok.
+ * `status` HTTP + `body` raw (JSON parseado ou texto) ficam acessiveis pro caller
+ * tratar casos especificos (ex.: 409 conflito vs 404 nao-encontrado).
+ */
 export class ApiError extends Error {
   constructor(
     message: string,
     public readonly status: number,
+    public readonly body: unknown = null,
   ) {
     super(message);
     this.name = "ApiError";

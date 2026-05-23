@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { apiUrl } from "../../shared/api/apiClient";
+import { apiFetch } from "../../shared/api/apiClient";
 
 type TelefoneUtilListItem = {
   id: string;
@@ -144,12 +144,7 @@ export function TelefonesUteisManagementScreen() {
         ? `/api/telefones-uteis?${queryString}`
         : "/api/telefones-uteis";
 
-      const response = await fetch(apiUrl(endpoint));
-      if (!response.ok) {
-        throw new Error(`Falha ao carregar telefones úteis (${response.status})`);
-      }
-
-      const data: TelefoneUtilListItem[] = await response.json();
+      const data = await apiFetch<TelefoneUtilListItem[]>("GET", endpoint);
       setTelefones(Array.isArray(data) ? data : []);
     } catch (err) {
       setTelefones([]);
@@ -198,20 +193,8 @@ export function TelefonesUteisManagementScreen() {
       const endpoint = editingId ? `/api/telefones-uteis/${editingId}` : "/api/telefones-uteis";
       const method = editingId ? "PUT" : "POST";
 
-      const response = await fetch(apiUrl(endpoint), {
-        method,
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        const body = await response.json().catch(() => null) as { message?: string } | null;
-        const operationLabel = editingId ? "atualizar" : "cadastrar";
-        const reason = body?.message ?? `Falha ao ${operationLabel} telefone útil (${response.status})`;
-        throw new Error(reason);
-      }
+      // apiFetch extrai message do body em respostas !ok (ApiError.message).
+      await apiFetch(method, endpoint, { body: payload });
 
       setFormData(INITIAL_FORM);
       setInitialModalForm(INITIAL_FORM);
@@ -231,12 +214,7 @@ export function TelefonesUteisManagementScreen() {
     setSuccessMessage(null);
 
     try {
-      const response = await fetch(apiUrl(`/api/telefones-uteis/${id}`));
-      if (!response.ok) {
-        throw new Error(`Falha ao buscar telefone útil para edição (${response.status})`);
-      }
-
-      const data = await response.json() as TelefoneUtilListItem;
+      const data = await apiFetch<TelefoneUtilListItem>("GET", `/api/telefones-uteis/${id}`);
       setEditingId(id);
       const nextFormData: TelefoneUtilPayload = {
         nome: data.nome ?? "",
@@ -288,9 +266,13 @@ export function TelefonesUteisManagementScreen() {
     }
 
     try {
-      const response = await fetch(apiUrl(`/api/telefones-uteis/${id}`), { method: "DELETE" });
-      if (!response.ok && response.status !== 404) {
-        throw new Error(`Falha ao excluir telefone útil (${response.status})`);
+      try {
+        await apiFetch("DELETE", `/api/telefones-uteis/${id}`);
+      } catch (err) {
+        // 404 tolerado: registro ja desativado.
+        if (!(err instanceof Error) || !err.message.includes("404")) {
+          throw err;
+        }
       }
 
       setSuccessMessage("Telefone útil desativado com sucesso.");
@@ -313,18 +295,7 @@ export function TelefonesUteisManagementScreen() {
     };
 
     try {
-      const response = await fetch(apiUrl(`/api/telefones-uteis/${item.id}`), {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`Falha ao reativar telefone útil (${response.status})`);
-      }
-
+      await apiFetch("PUT", `/api/telefones-uteis/${item.id}`, { body: payload });
       setSuccessMessage("Telefone útil reativado com sucesso.");
       await loadTelefones(statusFiltro);
     } catch (err) {
