@@ -18,7 +18,6 @@ import {
 } from "./MapHelpers";
 import {
   createPontoInstitucionalMarkerIcon,
-  getPontoInstitucionalColor,
   getPontoInstitucionalTipoBadgeClass,
   getPontoInstitucionalTipoIcon,
   getPontoInstitucionalTipoIconClass,
@@ -697,7 +696,10 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
     return center;
   }, [center, empresaSelecionadaNoMapa, vizinhanca]);
 
-  const empresasProximas = vizinhanca?.empresasProximas ?? [];
+  const empresasProximas = useMemo(
+    () => vizinhanca?.empresasProximas ?? [],
+    [vizinhanca?.empresasProximas],
+  );
 
   const empresasMesmoCnae = useMemo(() => {
     return empresasProximas.filter((empresa) => empresa.mesmoCnae);

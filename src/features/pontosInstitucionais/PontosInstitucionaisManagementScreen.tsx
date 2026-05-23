@@ -1,4 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+
+const PONTOS_QUERY_KEY = "pontos-institucionais";
 import { apiFetch, apiUrl, staticUrl } from "../../shared/api/apiClient";
 
 type PontoInstitucionalListItem = {
@@ -182,10 +185,9 @@ function parseTipoValue(tipo: string) {
 }
 
 export function PontosInstitucionaisManagementScreen() {
-  const [pontos, setPontos] = useState<PontoInstitucionalListItem[]>([]);
+  const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"ativos" | "inativos" | "todos">("ativos");
-  const [loadingList, setLoadingList] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -207,38 +209,31 @@ export function PontosInstitucionaisManagementScreen() {
     return JSON.stringify(formData) !== JSON.stringify(initialModalForm);
   }, [formData, initialModalForm, isModalOpen]);
 
-  async function loadPontos(status: "ativos" | "inativos" | "todos" = statusFiltro) {
-    setLoadingList(true);
-    setError(null);
-
-    try {
+  const {
+    data: pontos = [],
+    isLoading: loadingList,
+    error: queryError,
+    refetch: refetchPontos,
+  } = useQuery({
+    queryKey: [PONTOS_QUERY_KEY, statusFiltro],
+    queryFn: async () => {
       const params = new URLSearchParams();
-      if (status === "ativos") {
-        params.set("ativo", "true");
-      }
-
-      if (status === "inativos") {
-        params.set("ativo", "false");
-      }
-
+      if (statusFiltro === "ativos") params.set("ativo", "true");
+      if (statusFiltro === "inativos") params.set("ativo", "false");
       const queryString = params.toString();
       const endpoint = queryString
         ? `/api/pontos-institucionais?${queryString}`
         : "/api/pontos-institucionais";
-
       const data = await apiFetch<PontoInstitucionalListItem[]>("GET", endpoint);
-      setPontos(Array.isArray(data) ? data : []);
-    } catch (err) {
-      setPontos([]);
-      setError(err instanceof Error ? err.message : "Erro ao carregar pontos institucionais.");
-    } finally {
-      setLoadingList(false);
-    }
-  }
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
-  useEffect(() => {
-    loadPontos(statusFiltro);
-  }, [statusFiltro]);
+  const queryErrorMessage = queryError instanceof Error ? queryError.message : null;
+
+  function invalidatePontos() {
+    return queryClient.invalidateQueries({ queryKey: [PONTOS_QUERY_KEY] });
+  }
 
   const filteredPontos = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();
@@ -297,7 +292,7 @@ export function PontosInstitucionaisManagementScreen() {
       setEditingId(null);
       setIsModalOpen(false);
       setSuccessMessage(editingId ? "Ponto institucional atualizado com sucesso." : "Ponto institucional cadastrado com sucesso.");
-      await loadPontos();
+      await invalidatePontos();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar ponto institucional.");
     } finally {
@@ -437,6 +432,7 @@ export function PontosInstitucionaisManagementScreen() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- handleRequestCloseModal estavel via closure
   }, [isModalDirty, isModalOpen]);
 
   async function handleDelete(id: string) {
@@ -459,7 +455,7 @@ export function PontosInstitucionaisManagementScreen() {
       }
 
       setSuccessMessage("Ponto institucional desativado com sucesso.");
-      await loadPontos(statusFiltro);
+      await invalidatePontos();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao excluir ponto institucional.");
     }
@@ -535,7 +531,7 @@ export function PontosInstitucionaisManagementScreen() {
         setSuccessMessage(summary);
       }
 
-      await loadPontos(statusFiltro);
+      await invalidatePontos();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao importar pontos institucionais.");
     } finally {
@@ -572,7 +568,7 @@ export function PontosInstitucionaisManagementScreen() {
     try {
       await apiFetch("PUT", `/api/pontos-institucionais/${item.id}`, { body: payload });
       setSuccessMessage("Ponto institucional reativado com sucesso.");
-      await loadPontos(statusFiltro);
+      await invalidatePontos();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao reativar ponto institucional.");
     }
@@ -625,12 +621,12 @@ export function PontosInstitucionaisManagementScreen() {
             onChange={handleImportCsvFile}
             style={{ display: "none" }}
           />
-          <button type="button" className="ghost btn-with-icon btn-action-refresh" onClick={() => loadPontos()} disabled={loadingList}>
+          <button type="button" className="ghost btn-with-icon btn-action-refresh" onClick={() => refetchPontos()} disabled={loadingList}>
             {loadingList ? "Atualizando..." : "Atualizar"}
           </button>
         </div>
 
-        {error && <p className="status-error">{error}</p>}
+        {(error || queryErrorMessage) && <p className="status-error">{error || queryErrorMessage}</p>}
         {successMessage && <p className="status-info">{successMessage}</p>}
 
         <div className="table-wrapper">

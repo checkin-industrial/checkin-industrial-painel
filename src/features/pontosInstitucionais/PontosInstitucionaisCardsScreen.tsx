@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { apiFetch, staticUrl } from "../../shared/api/apiClient";
 
 type PontoInstitucionalCardItem = {
@@ -70,35 +71,27 @@ function firstAvailableImage(item: PontoInstitucionalCardItem) {
 }
 
 export function PontosInstitucionaisCardsScreen({ onRouteToPoint }: PontosInstitucionaisCardsScreenProps) {
-  const [pontos, setPontos] = useState<PontoInstitucionalCardItem[]>([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [flippedCardId, setFlippedCardId] = useState<string | null>(null);
 
-  async function loadPontos() {
-    setLoading(true);
-    setError(null);
-
-    try {
+  const {
+    data: pontos = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["pontos-institucionais", "ativos"],
+    queryFn: async () => {
       const data = await apiFetch<PontoInstitucionalCardItem[]>(
         "GET",
         "/api/pontos-institucionais?ativo=true",
       );
       const list = Array.isArray(data) ? data : [];
       list.sort((left, right) => (left.ordemExibicao ?? 0) - (right.ordemExibicao ?? 0));
-      setPontos(list);
-    } catch (err) {
-      setPontos([]);
-      setError(err instanceof Error ? err.message : "Erro ao carregar pontos institucionais.");
-    } finally {
-      setLoading(false);
-    }
-  }
+      return list;
+    },
+  });
 
-  useEffect(() => {
-    loadPontos();
-  }, []);
+  const error = queryError instanceof Error ? queryError.message : null;
 
   const filteredPontos = useMemo(() => {
     const normalizedSearch = searchTerm.trim().toLowerCase();

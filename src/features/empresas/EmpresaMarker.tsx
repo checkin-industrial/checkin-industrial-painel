@@ -1,3 +1,5 @@
+/* eslint-disable react-refresh/only-export-components -- helper (createEmpresaMarkerIcon)
+ * + componente coabitam o mesmo arquivo intencionalmente (escopo de feature pequena). */
 import { divIcon } from "leaflet";
 import { Marker, Tooltip } from "react-leaflet";
 

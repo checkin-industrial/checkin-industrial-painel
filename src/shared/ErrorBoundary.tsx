@@ -26,7 +26,6 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
 
   componentDidCatch(error: Error, info: ErrorInfo) {
     // Sem APM/Sentry aqui (escopo widget). Log no console para o dev.
-    // eslint-disable-next-line no-console
     console.error("[ErrorBoundary]", error, info);
   }
 
