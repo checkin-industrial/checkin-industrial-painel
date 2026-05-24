@@ -65,7 +65,7 @@ export function PontoInstitucionalFormModal({
               <select
                 value={formData.tipo}
                 onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, tipo: Number(event.target.value) }))
+                  setFormData((prev) => ({ ...prev, tipo: event.target.value }))
                 }
               >
                 {TIPO_OPTIONS.map((option) => (

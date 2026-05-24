@@ -27,12 +27,12 @@ export type PontoInstitucionalListItem = {
   ativo: boolean;
 };
 
-// Payload de Create/Update (tipo ainda int no contrato porque a API aceita
-// ambos string e int via allowIntegerValues=true). Pode virar string num PR
-// futuro alinhado com a serializacao da API.
+// Payload de Create/Update. tipo serializado como string camelCase (espelha
+// o JsonStringEnumConverter na API). API ainda aceita ints via
+// allowIntegerValues=true, mas o painel envia strings agora.
 export type PontoInstitucionalPayload = {
   nome: string;
-  tipo: number;
+  tipo: string;
   descricao: string;
   endereco: string;
   latitude: number;
@@ -55,20 +55,22 @@ export type UploadCategoria = "foto" | "logo" | "card";
 
 export type StatusFiltroPonto = "ativos" | "inativos" | "todos";
 
-export const TIPO_OPTIONS: ReadonlyArray<{ value: number; label: string }> = [
-  { value: 1, label: "Educação" },
-  { value: 2, label: "Comércio" },
-  { value: 3, label: "Financeiro" },
-  { value: 4, label: "Serviço" },
-  { value: 5, label: "Setor Prefeitura" },
-  { value: 6, label: "Ponto Turístico" },
-  { value: 7, label: "Hotel / Hospedagem" },
-  { value: 8, label: "Ecoturismo" },
+// Valores espelham os names dos enums da API serializados em camelCase
+// (TipoPontoInstitucional). Labels permanecem em PT-BR pra UI.
+export const TIPO_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: "educacao", label: "Educação" },
+  { value: "comercio", label: "Comércio" },
+  { value: "financeiro", label: "Financeiro" },
+  { value: "servico", label: "Serviço" },
+  { value: "setorPrefeitura", label: "Setor Prefeitura" },
+  { value: "pontoTuristico", label: "Ponto Turístico" },
+  { value: "hotel", label: "Hotel / Hospedagem" },
+  { value: "ecoturismo", label: "Ecoturismo" },
 ];
 
 export const INITIAL_FORM_PONTO: PontoInstitucionalPayload = {
   nome: "",
-  tipo: 1,
+  tipo: "educacao",
   descricao: "",
   endereco: "",
   latitude: -22.6,
@@ -86,34 +88,3 @@ export const INITIAL_FORM_PONTO: PontoInstitucionalPayload = {
   ordemExibicao: 0,
   ativo: true,
 };
-
-// Mapeia o nome do tipo (string camelCase ou legacy snake/concat) pro int do
-// enum esperado no payload de Create/Update. Default Servico (4) pra valores
-// desconhecidos - mantem o comportamento legado.
-export function parsePontoTipoValue(tipo: string): number {
-  const normalized = tipo.trim().toLowerCase();
-
-  switch (normalized) {
-    case "educacao":
-      return 1;
-    case "comercio":
-      return 2;
-    case "financeiro":
-      return 3;
-    case "servico":
-    case "servicos":
-      return 4;
-    case "setorprefeitura":
-    case "setor_prefeitura":
-      return 5;
-    case "pontoturistico":
-    case "ponto_turistico":
-      return 6;
-    case "hotel":
-      return 7;
-    case "ecoturismo":
-      return 8;
-    default:
-      return 4;
-  }
-}
