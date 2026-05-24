@@ -10,6 +10,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { createEmpresaMarkerIcon } from "./EmpresaMarker";
 import { useDraggable } from "../../shared/hooks/useDraggable";
+import { useAuth } from "../../shared/auth/AuthContext";
 import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
@@ -93,6 +94,10 @@ type MapTargetPoint = {
 
 type EmpresasFilterMapExampleProps = {
   mapTargetPoint?: MapTargetPoint | null;
+  // Admin atalho: callback que abre a empresa direto na tela de Gestao em
+  // modo de edicao. Quando definida + usuario autenticado, o painel de
+  // Relatorio mostra um botao "Editar cadastro" no card da empresa base.
+  onAdminEditEmpresa?: (empresaId: string) => void;
 };
 
 type ReportSectionKey = "proximas" | "cnae" | "setor";
@@ -267,7 +272,8 @@ function matchesPontoInstitucionalFilters(
   return searchableText.includes(termo);
 }
 
-export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapExampleProps) {
+export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }: EmpresasFilterMapExampleProps) {
+  const { isAuthenticated } = useAuth();
   const [filters, setFilters] = useState<FilterFormState>(INITIAL_FILTERS);
   const [pontoFilters, setPontoFilters] = useState<PontoInstitucionalFilterState>(INITIAL_PONTO_FILTERS);
   const [cnaeOptions, setCnaeOptions] = useState<CnaeOption[]>([{ value: "", label: "Todos" }]);
@@ -314,10 +320,10 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
   } = useQuery({
     queryKey: ["empresas", "filter", effectiveFilters],
     queryFn: async () => {
-      // Widget publico sempre filtra ativo=true; empresas soft-deletadas (Ativo=false)
-      // so aparecem na tela de Gestao Admin -> dropdown "inativas".
+      // Widget publico sempre filtra Status=Ativo; empresas Inativo (soft-delete) e
+      // AguardandoRevisao (import nao aprovado) so aparecem na Gestao Admin.
       const params = new URLSearchParams(buildQueryString(effectiveFilters));
-      params.set("ativo", "true");
+      params.set("status", "ativo");
       const endpoint = `/api/empresas/filter?${params.toString()}`;
       const data = await apiFetch<EmpresaFilterMapItem[]>("GET", endpoint);
       return Array.isArray(data) ? data : [];
@@ -1166,6 +1172,15 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
                             <span>Setor: {vizinhanca.empresaBase.setor}</span>
                             <span>Município: {vizinhanca.empresaBase.municipio}</span>
                             <span>Funcionários: {vizinhanca.empresaBase.numeroFuncionarios}</span>
+                            {isAuthenticated && onAdminEditEmpresa && vizinhanca.empresaBase.id && (
+                              <button
+                                type="button"
+                                className="ghost btn-with-icon btn-action-edit btn-edit-empresa-from-map"
+                                onClick={() => onAdminEditEmpresa(vizinhanca.empresaBase.id)}
+                              >
+                                Editar cadastro
+                              </button>
+                            )}
                           </div>
                         )}
                       </section>

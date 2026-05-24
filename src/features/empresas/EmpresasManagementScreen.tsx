@@ -17,8 +17,33 @@ type EmpresaListItem = {
   matrizOuFilial: string;
   latitude: number;
   longitude: number;
-  ativo: boolean;
+  status: StatusEmpresa;
 };
+
+// Reflete StatusEmpresa do backend (int enum). Painel mantem como numero
+// pra evitar serializacao customizada no .NET.
+export const STATUS = {
+  Ativo: 1,
+  Inativo: 2,
+  AguardandoRevisao: 3,
+} as const;
+export type StatusEmpresa = 1 | 2 | 3;
+
+export function statusLabel(status: StatusEmpresa) {
+  switch (status) {
+    case STATUS.Ativo: return "Ativa";
+    case STATUS.Inativo: return "Inativa";
+    case STATUS.AguardandoRevisao: return "Aguardando revisão";
+  }
+}
+
+export function statusBadgeClass(status: StatusEmpresa) {
+  switch (status) {
+    case STATUS.Ativo: return "tipo-badge ativa";
+    case STATUS.Inativo: return "tipo-badge inativa";
+    case STATUS.AguardandoRevisao: return "tipo-badge aguardando";
+  }
+}
 
 type EmpresaCreatePayload = {
   cnpj: string;
@@ -37,7 +62,7 @@ type EmpresaCreatePayload = {
   latitude: number;
   longitude: number;
   situacaoCadastral: number;
-  ativo?: boolean;
+  status?: StatusEmpresa;
 };
 
 type EmpresaDetalheResponse = {
@@ -59,7 +84,7 @@ type EmpresaDetalheResponse = {
   latitude: number;
   longitude: number;
   situacaoCadastral: number;
-  ativo?: boolean;
+  status?: StatusEmpresa;
 };
 
 type EmpresaDetalheResponseRaw = EmpresaDetalheResponse & {
@@ -127,10 +152,19 @@ function sanitizeDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
-export function EmpresasManagementScreen() {
+// Atalho admin do mapa publico: quando o usuario clica em "Editar cadastro"
+// no popup, App.tsx muda tab pra "gestao" e passa o id da empresa via pendingEditId.
+// Ao detectar a prop preenchida, abrimos automaticamente o modal de edicao
+// e chamamos onEditConsumed pra zerar o estado pai (evita reabrir em re-renders).
+type EmpresasManagementScreenProps = {
+  pendingEditId?: string | null;
+  onEditConsumed?: () => void;
+};
+
+export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: EmpresasManagementScreenProps = {}) {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFiltro, setStatusFiltro] = useState<"ativos" | "inativos" | "todos">("ativos");
+  const [statusFiltro, setStatusFiltro] = useState<"ativo" | "inativo" | "aguardando-revisao" | "todos">("ativo");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -157,10 +191,8 @@ export function EmpresasManagementScreen() {
     queryKey: [EMPRESAS_QUERY_KEY, "list", statusFiltro],
     queryFn: async () => {
       const params = new URLSearchParams();
-      if (statusFiltro === "ativos") params.set("ativo", "true");
-      if (statusFiltro === "inativos") params.set("ativo", "false");
-      const qs = params.toString();
-      const url = qs ? `/api/empresas/filter?${qs}` : "/api/empresas/filter";
+      params.set("status", statusFiltro);
+      const url = `/api/empresas/filter?${params.toString()}`;
       const data = await apiFetch<EmpresaListItem[]>("GET", url);
       return Array.isArray(data) ? data : [];
     },
@@ -233,6 +265,21 @@ export function EmpresasManagementScreen() {
     }
   }
 
+  // Deep-link do mapa: ao detectar pendingEditId, abre o modal de edicao
+  // pra aquela empresa e notifica o pai pra zerar o pendingEditId (evita
+  // reabrir em cada re-render). Skip se modal ja esta aberto (defesa contra
+  // race no fechamento manual).
+  useEffect(() => {
+    if (!pendingEditId || isModalOpen) {
+      return;
+    }
+    handleEdit(pendingEditId);
+    onEditConsumed?.();
+    // handleEdit/onEditConsumed sao estaveis no escopo; eslint pediria adiciona-las
+    // mas isso geraria loop (handleEdit muda formData -> re-render -> dispara de novo).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingEditId]);
+
   async function handleEdit(id: string) {
     setError(null);
     setSuccessMessage(null);
@@ -266,7 +313,7 @@ export function EmpresasManagementScreen() {
         latitude: Number(data.latitude),
         longitude: Number(data.longitude),
         situacaoCadastral: Number(data.situacaoCadastral) || 1,
-        ativo: data.ativo ?? true,
+        status: (data.status ?? STATUS.Ativo) as StatusEmpresa,
       };
       setFormData(nextFormData);
       setInitialModalForm(nextFormData);
@@ -381,14 +428,15 @@ export function EmpresasManagementScreen() {
         latitude: Number(detalhe.latitude),
         longitude: Number(detalhe.longitude),
         situacaoCadastral: Number(detalhe.situacaoCadastral) || 1,
-        ativo: true,
+        status: STATUS.Ativo,
       };
 
       await apiFetch("PUT", `/api/empresas/${empresa.id}`, { body: payload });
-      setSuccessMessage(`Empresa "${empresa.nomeFantasia}" reativada com sucesso.`);
+      const verbo = empresa.status === STATUS.AguardandoRevisao ? "aprovada" : "reativada";
+      setSuccessMessage(`Empresa "${empresa.nomeFantasia}" ${verbo} com sucesso.`);
       await invalidateEmpresas();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao reativar empresa.");
+      setError(err instanceof Error ? err.message : "Erro ao aprovar/reativar empresa.");
     }
   }
 
@@ -443,11 +491,12 @@ export function EmpresasManagementScreen() {
           />
           <select
             value={statusFiltro}
-            onChange={(event) => setStatusFiltro(event.target.value as "ativos" | "inativos" | "todos")}
+            onChange={(event) => setStatusFiltro(event.target.value as typeof statusFiltro)}
             aria-label="Filtro de status"
           >
-            <option value="ativos">Somente ativas</option>
-            <option value="inativos">Somente inativas</option>
+            <option value="ativo">Somente ativas</option>
+            <option value="inativo">Somente inativas</option>
+            <option value="aguardando-revisao">Aguardando revisão</option>
             <option value="todos">Todas</option>
           </select>
           <button type="button" className="btn-with-icon btn-action-new" onClick={handleOpenCreateModal}>
@@ -493,23 +542,34 @@ export function EmpresasManagementScreen() {
                     <span>{empresa.telefone || "-"}</span>
                     <small>CEP: {empresa.cep || "-"}</small>
                   </td>
-                  <td data-label="Status">{empresa.ativo ? "Ativa" : "Inativa"}</td>
+                  <td data-label="Status">
+                    <span className={statusBadgeClass(empresa.status)}>{statusLabel(empresa.status)}</span>
+                  </td>
                   <td data-label="Ações">
                     <div className="action-group">
                       <button type="button" className="warning btn-with-icon btn-action-edit" onClick={() => handleEdit(empresa.id)}>
                         Editar
                       </button>
-                      {empresa.ativo
-                        ? (
-                          <button type="button" className="danger btn-with-icon btn-action-delete" onClick={() => handleDelete(empresa.id)}>
-                            Excluir
-                          </button>
-                          )
-                        : (
+                      {empresa.status === STATUS.Ativo && (
+                        <button type="button" className="danger btn-with-icon btn-action-delete" onClick={() => handleDelete(empresa.id)}>
+                          Excluir
+                        </button>
+                      )}
+                      {empresa.status === STATUS.Inativo && (
+                        <button type="button" className="ghost btn-with-icon btn-action-reactivate" onClick={() => handleReactivate(empresa)}>
+                          Reativar
+                        </button>
+                      )}
+                      {empresa.status === STATUS.AguardandoRevisao && (
+                        <>
                           <button type="button" className="ghost btn-with-icon btn-action-reactivate" onClick={() => handleReactivate(empresa)}>
-                            Reativar
+                            Aprovar
                           </button>
-                          )}
+                          <button type="button" className="danger btn-with-icon btn-action-delete" onClick={() => handleDelete(empresa.id)}>
+                            Rejeitar
+                          </button>
+                        </>
+                      )}
                     </div>
                   </td>
                 </tr>

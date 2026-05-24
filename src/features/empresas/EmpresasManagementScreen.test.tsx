@@ -21,7 +21,7 @@ const EMPRESA_BASE = {
   matrizOuFilial: "Matriz",
   latitude: -22.3,
   longitude: -49.05,
-  ativo: true,
+  status: 1,
 };
 
 describe("EmpresasManagementScreen (smoke)", () => {
@@ -62,5 +62,50 @@ describe("EmpresasManagementScreen (smoke)", () => {
     await waitFor(() => {
       expect(screen.getByText(/HTTP 500|erro/i)).toBeInTheDocument();
     });
+  });
+
+  it("pendingEditId dispara fetch do detalhe + onEditConsumed", async () => {
+    // 1) GET /api/empresas/filter (lista vazia ok pra esse teste)
+    fetchSpy.mockResolvedValueOnce(
+      new Response(JSON.stringify([]), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    // 2) GET /api/empresas/{id} (detalhe disparado pelo deep-link)
+    fetchSpy.mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          id: "abc-123",
+          cnpj: "12345678000100",
+          razaoSocial: "Deep Link Empresa LTDA",
+          nomeFantasia: "Deep Link",
+          cnaePrincipal: "0000000",
+          descricaoCnae: "",
+          setor: 1,
+          porte: 2,
+          numeroFuncionarios: 5,
+          endereco: "Rua X, 1",
+          telefone: "",
+          cep: "01000000",
+          municipio: "Bauru",
+          matrizOuFilialCodigo: 1,
+          latitude: -22.3,
+          longitude: -49.05,
+          situacaoCadastral: 1,
+          status: 1,
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const onEditConsumed = vi.fn();
+    renderWithClient(
+      <EmpresasManagementScreen pendingEditId="abc-123" onEditConsumed={onEditConsumed} />,
+    );
+
+    await waitFor(() => expect(onEditConsumed).toHaveBeenCalled());
+    // Modal de edicao aberto -> titulo "Editar Empresa" presente
+    await waitFor(() => expect(screen.getByText(/Editar Empresa/i)).toBeInTheDocument());
   });
 });

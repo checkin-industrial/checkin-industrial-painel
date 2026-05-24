@@ -2455,6 +2455,24 @@ button {
   color: #166534;
 }
 
+.tipo-badge.ativa {
+  border-color: #86efac;
+  background: #dcfce7;
+  color: #166534;
+}
+
+.tipo-badge.inativa {
+  border-color: #d1d5db;
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.tipo-badge.aguardando {
+  border-color: #fcd34d;
+  background: #fef3c7;
+  color: #92400e;
+}
+
 .empresa-marker-wrapper {
   background: transparent;
   border: 0;
