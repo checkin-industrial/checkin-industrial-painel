@@ -1,199 +1,29 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiFetch, apiUrl } from "../../shared/api/apiClient";
+import { PontoInstitucionalFormModal } from "./components/PontoInstitucionalFormModal";
+import { PontoInstitucionalListToolbar } from "./components/PontoInstitucionalListToolbar";
+import { PontoInstitucionalTable } from "./components/PontoInstitucionalTable";
+import {
+  INITIAL_FORM_PONTO,
+  parsePontoTipoValue,
+  type PontoInstitucionalListItem,
+  type PontoInstitucionalPayload,
+  type StatusFiltroPonto,
+  type UploadCategoria,
+} from "./types";
 
 const PONTOS_QUERY_KEY = "pontos-institucionais";
-import { apiFetch, apiUrl, staticUrl } from "../../shared/api/apiClient";
-import styles from "./PontosInstitucionaisManagementScreen.module.css";
-
-type PontoInstitucionalListItem = {
-  id: string;
-  nome: string;
-  tipo: string;
-  descricao: string;
-  endereco: string;
-  latitude: number;
-  longitude: number;
-  atividadesDisponiveis: string;
-  equipeGestao: string;
-  contatoNome: string;
-  contatoTelefone: string;
-  contatoEmail: string;
-  responsavelFotoUrl?: string | null;
-  logoUrl?: string | null;
-  cardFotoUrl?: string | null;
-  corMarcador: string;
-  iconeMarcador: string;
-  ordemExibicao: number;
-  ativo: boolean;
-};
-
-type PontoInstitucionalPayload = {
-  nome: string;
-  tipo: number;
-  descricao: string;
-  endereco: string;
-  latitude: number;
-  longitude: number;
-  atividadesDisponiveis: string;
-  equipeGestao: string;
-  contatoNome: string;
-  contatoTelefone: string;
-  contatoEmail: string;
-  responsavelFotoUrl?: string;
-  logoUrl?: string;
-  cardFotoUrl?: string;
-  corMarcador: string;
-  iconeMarcador: string;
-  ordemExibicao: number;
-  ativo: boolean;
-};
-
-type UploadCategoria = "foto" | "logo" | "card";
-
-const TIPO_OPTIONS = [
-  { value: 1, label: "Educação" },
-  { value: 2, label: "Comércio" },
-  { value: 3, label: "Financeiro" },
-  { value: 4, label: "Serviço" },
-  { value: 5, label: "Setor Prefeitura" },
-  { value: 6, label: "Ponto Turístico" },
-  { value: 7, label: "Hotel / Hospedagem" },
-  { value: 8, label: "Ecoturismo" },
-];
-
-const INITIAL_FORM: PontoInstitucionalPayload = {
-  nome: "",
-  tipo: 1,
-  descricao: "",
-  endereco: "",
-  latitude: -22.6,
-  longitude: -48.8,
-  atividadesDisponiveis: "",
-  equipeGestao: "",
-  contatoNome: "",
-  contatoTelefone: "",
-  contatoEmail: "",
-  responsavelFotoUrl: "",
-  logoUrl: "",
-  cardFotoUrl: "",
-  corMarcador: "#0d9488",
-  iconeMarcador: "institucional",
-  ordemExibicao: 0,
-  ativo: true,
-};
-
-function tipoLabel(tipo: string) {
-  const normalized = tipo.trim().toLowerCase();
-
-  switch (normalized) {
-    case "educacao":
-      return "Educação";
-    case "comercio":
-      return "Comércio";
-    case "financeiro":
-      return "Financeiro";
-    case "servico":
-      return "Serviço";
-    case "setorprefeitura":
-    case "setor_prefeitura":
-      return "Setor Prefeitura";
-    case "pontoturistico":
-      return "Ponto Turístico";
-    case "hotel":
-      return "Hotel / Hospedagem";
-    case "ecoturismo":
-      return "Ecoturismo";
-    default:
-      return tipo;
-  }
-}
-
-function tipoBadgeClass(tipo: string) {
-  const normalized = tipo.trim().toLowerCase();
-
-  switch (normalized) {
-    case "educacao":
-      return "tipo-badge educacao";
-    case "comercio":
-      return "tipo-badge comercio";
-    case "financeiro":
-      return "tipo-badge financeiro";
-    case "servico":
-      return "tipo-badge servico";
-    case "setorprefeitura":
-    case "setor_prefeitura":
-      return "tipo-badge setor-prefeitura";
-    case "pontoturistico":
-      return "tipo-badge ponto-turistico";
-    case "hotel":
-      return "tipo-badge hotel";
-    case "ecoturismo":
-      return "tipo-badge ecoturismo";
-    default:
-      return "tipo-badge";
-  }
-}
-
-function tipoIcon(tipo: string) {
-  const normalized = tipo.trim().toLowerCase();
-
-  switch (normalized) {
-    case "educacao":
-      return "EDU";
-    case "comercio":
-      return "COM";
-    case "financeiro":
-      return "FIN";
-    case "servico":
-      return "SRV";
-    case "setorprefeitura":
-    case "setor_prefeitura":
-      return "GOV";
-    default:
-      return "TIP";
-  }
-}
-
-function parseTipoValue(tipo: string) {
-  const normalized = tipo.trim().toLowerCase();
-
-  switch (normalized) {
-    case "educacao":
-      return 1;
-    case "comercio":
-      return 2;
-    case "financeiro":
-      return 3;
-    case "servico":
-      return 4;
-    case "sedecom":
-      return 5;
-    case "senai":
-      return 1;
-    case "setorprefeitura":
-    case "setor_prefeitura":
-      return 5;
-    case "pontoturistico":
-    case "ponto_turistico":
-      return 6;
-    case "hotel":
-      return 7;
-    case "ecoturismo":
-      return 8;
-    default:
-      return 4;
-  }
-}
 
 export function PontosInstitucionaisManagementScreen() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFiltro, setStatusFiltro] = useState<"ativos" | "inativos" | "todos">("ativos");
+  const [statusFiltro, setStatusFiltro] = useState<StatusFiltroPonto>("ativos");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-  const [formData, setFormData] = useState<PontoInstitucionalPayload>(INITIAL_FORM);
-  const [initialModalForm, setInitialModalForm] = useState<PontoInstitucionalPayload>(INITIAL_FORM);
+  const [formData, setFormData] = useState<PontoInstitucionalPayload>(INITIAL_FORM_PONTO);
+  const [initialModalForm, setInitialModalForm] = useState<PontoInstitucionalPayload>(INITIAL_FORM_PONTO);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [uploadingFoto, setUploadingFoto] = useState(false);
@@ -283,16 +113,22 @@ export function PontosInstitucionaisManagementScreen() {
     };
 
     try {
-      const endpoint = editingId ? `/api/pontos-institucionais/${editingId}` : "/api/pontos-institucionais";
+      const endpoint = editingId
+        ? `/api/pontos-institucionais/${editingId}`
+        : "/api/pontos-institucionais";
       const method = editingId ? "PUT" : "POST";
 
       await apiFetch(method, endpoint, { body: payload });
 
-      setFormData(INITIAL_FORM);
-      setInitialModalForm(INITIAL_FORM);
+      setFormData(INITIAL_FORM_PONTO);
+      setInitialModalForm(INITIAL_FORM_PONTO);
       setEditingId(null);
       setIsModalOpen(false);
-      setSuccessMessage(editingId ? "Ponto institucional atualizado com sucesso." : "Ponto institucional cadastrado com sucesso.");
+      setSuccessMessage(
+        editingId
+          ? "Ponto institucional atualizado com sucesso."
+          : "Ponto institucional cadastrado com sucesso.",
+      );
       await invalidatePontos();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar ponto institucional.");
@@ -306,16 +142,15 @@ export function PontosInstitucionaisManagementScreen() {
     setSuccessMessage(null);
 
     try {
-      const responseData = await apiFetch<PontoInstitucionalListItem>(
+      const data = await apiFetch<PontoInstitucionalListItem>(
         "GET",
         `/api/pontos-institucionais/${id}`,
       );
 
-      const data = responseData;
       setEditingId(id);
       const nextFormData: PontoInstitucionalPayload = {
         nome: data.nome ?? "",
-        tipo: parseTipoValue(data.tipo),
+        tipo: parsePontoTipoValue(data.tipo),
         descricao: data.descricao ?? "",
         endereco: data.endereco ?? "",
         latitude: Number(data.latitude),
@@ -337,7 +172,9 @@ export function PontosInstitucionaisManagementScreen() {
       setInitialModalForm(nextFormData);
       setIsModalOpen(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao preparar edição do ponto institucional.");
+      setError(
+        err instanceof Error ? err.message : "Erro ao preparar edição do ponto institucional.",
+      );
     }
   }
 
@@ -350,8 +187,8 @@ export function PontosInstitucionaisManagementScreen() {
     }
 
     setEditingId(null);
-    setFormData(INITIAL_FORM);
-    setInitialModalForm(INITIAL_FORM);
+    setFormData(INITIAL_FORM_PONTO);
+    setInitialModalForm(INITIAL_FORM_PONTO);
     setIsModalOpen(false);
     setError(null);
     setSuccessMessage(null);
@@ -359,8 +196,8 @@ export function PontosInstitucionaisManagementScreen() {
 
   function handleOpenCreateModal() {
     setEditingId(null);
-    setFormData(INITIAL_FORM);
-    setInitialModalForm(INITIAL_FORM);
+    setFormData(INITIAL_FORM_PONTO);
+    setInitialModalForm(INITIAL_FORM_PONTO);
     setError(null);
     setSuccessMessage(null);
     setIsModalOpen(true);
@@ -392,19 +229,20 @@ export function PontosInstitucionaisManagementScreen() {
         "/api/pontos-institucionais/upload-imagem",
         { body: form },
       );
-      setFormData((prev) => (
+      setFormData((prev) =>
         categoria === "foto"
           ? { ...prev, responsavelFotoUrl: data.url }
           : categoria === "logo"
             ? { ...prev, logoUrl: data.url }
-            : { ...prev, cardFotoUrl: data.url }
-      ));
+            : { ...prev, cardFotoUrl: data.url },
+      );
       setSuccessMessage(
         categoria === "foto"
           ? "Foto enviada com sucesso."
           : categoria === "logo"
             ? "Logo enviado com sucesso."
-            : "Imagem de card enviada com sucesso.");
+            : "Imagem de card enviada com sucesso.",
+      );
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao enviar imagem.");
     } finally {
@@ -527,7 +365,9 @@ export function PontosInstitucionaisManagementScreen() {
       const summary = `Importacao concluida. Total: ${total}, Inseridos: ${inserted}, Atualizados: ${updated}, Ignorados: ${skipped}.`;
       if (errors.length > 0) {
         const first = errors[0];
-        setError(`${summary} Primeiro erro: linha ${first.lineNumber ?? "?"}, campo ${first.fieldName ?? "?"} - ${first.message ?? "erro desconhecido"}.`);
+        setError(
+          `${summary} Primeiro erro: linha ${first.lineNumber ?? "?"}, campo ${first.fieldName ?? "?"} - ${first.message ?? "erro desconhecido"}.`,
+        );
       } else {
         setSuccessMessage(summary);
       }
@@ -547,7 +387,7 @@ export function PontosInstitucionaisManagementScreen() {
 
     const payload: PontoInstitucionalPayload = {
       nome: item.nome,
-      tipo: parseTipoValue(item.tipo),
+      tipo: parsePontoTipoValue(item.tipo),
       descricao: item.descricao,
       endereco: item.endereco,
       latitude: Number(item.latitude),
@@ -583,404 +423,46 @@ export function PontosInstitucionaisManagementScreen() {
           <span className="panel-hint">Total exibido: {filteredPontos.length}</span>
         </div>
 
-        <div className="company-list-toolbar">
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Buscar por nome, tipo, endereço ou contato"
-          />
-          <select
-            value={statusFiltro}
-            onChange={(event) => setStatusFiltro(event.target.value as "ativos" | "inativos" | "todos")}
-          >
-            <option value="ativos">Somente ativos</option>
-            <option value="inativos">Somente inativos</option>
-            <option value="todos">Todos</option>
-          </select>
-          <button type="button" className="btn-with-icon btn-action-new" onClick={handleOpenCreateModal}>
-            Novo Ponto
-          </button>
-          <button type="button" className="ghost btn-with-icon" onClick={() => handleExportCsv(false)}>
-            Exportar CSV
-          </button>
-          <button type="button" className="ghost btn-with-icon" onClick={() => handleExportCsv(true)}>
-            Exportar CSV ANSI
-          </button>
-          <button
-            type="button"
-            className="ghost btn-with-icon"
-            onClick={() => fileInputRef.current?.click()}
-            disabled={importingCsv}
-          >
-            {importingCsv ? "Importando..." : "Importar CSV"}
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={handleImportCsvFile}
-            style={{ display: "none" }}
-          />
-          <button type="button" className="ghost btn-with-icon btn-action-refresh" onClick={() => refetchPontos()} disabled={loadingList}>
-            {loadingList ? "Atualizando..." : "Atualizar"}
-          </button>
-        </div>
+        <PontoInstitucionalListToolbar
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          statusFiltro={statusFiltro}
+          onStatusFiltroChange={setStatusFiltro}
+          onOpenCreateModal={handleOpenCreateModal}
+          onExportCsv={handleExportCsv}
+          onImportCsvClick={() => fileInputRef.current?.click()}
+          onImportCsvFileChange={handleImportCsvFile}
+          fileInputRef={fileInputRef}
+          importingCsv={importingCsv}
+          onRefresh={() => refetchPontos()}
+          loadingList={loadingList}
+        />
 
         {(error || queryErrorMessage) && <p className="status-error">{error || queryErrorMessage}</p>}
         {successMessage && <p className="status-info">{successMessage}</p>}
 
-        <div className="table-wrapper">
-          <table className="company-table">
-            <thead>
-              <tr>
-                <th>Nome</th>
-                <th>Tipo</th>
-                <th>Endereço</th>
-                <th>Contato</th>
-                <th>Ordem</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredPontos.map((ponto) => (
-                <tr key={ponto.id}>
-                  <td data-label="Nome">
-                    <strong>{ponto.nome}</strong>
-                    <small>{ponto.descricao}</small>
-                  </td>
-                  <td data-label="Tipo">
-                    <span className={tipoBadgeClass(ponto.tipo)}>
-                      <span className="tipo-badge-icon" aria-hidden="true">{tipoIcon(ponto.tipo)}</span>
-                      {tipoLabel(ponto.tipo)}
-                    </span>
-                  </td>
-                  <td data-label="Endereço">{ponto.endereco}</td>
-                  <td data-label="Contato">
-                    <span>{ponto.contatoNome || "-"}</span>
-                    <small>{ponto.contatoTelefone || "-"} | {ponto.contatoEmail || "-"}</small>
-                  </td>
-                  <td data-label="Ordem">{ponto.ordemExibicao}</td>
-                  <td data-label="Status">{ponto.ativo ? "Ativo" : "Inativo"}</td>
-                  <td data-label="Ações">
-                    <div className="action-group">
-                      <button type="button" className="warning btn-with-icon btn-action-edit" onClick={() => handleEdit(ponto.id)}>
-                        Editar
-                      </button>
-                      {ponto.ativo
-                        ? (
-                          <button type="button" className="danger btn-with-icon btn-action-delete" onClick={() => handleDelete(ponto.id)}>
-                            Desativar
-                          </button>
-                          )
-                        : (
-                          <button type="button" className="ghost btn-with-icon btn-action-reactivate" onClick={() => handleReactivate(ponto)}>
-                            Reativar
-                          </button>
-                          )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {loadingList && filteredPontos.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="table-loading-cell">
-                    <div className="map-loading-spinner" />
-                    <div className="map-loading-label">Carregando pontos institucionais...</div>
-                  </td>
-                </tr>
-              )}
-
-              {!loadingList && filteredPontos.length === 0 && (
-                <tr>
-                  <td colSpan={7} className="empty-state">Nenhum ponto institucional encontrado para o filtro informado.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <PontoInstitucionalTable
+          pontos={filteredPontos}
+          loadingList={loadingList}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onReactivate={handleReactivate}
+        />
       </section>
 
-      {isModalOpen && (
-        <div className="app-modal-backdrop" role="dialog" aria-modal="true" onClick={handleRequestCloseModal}>
-          <div className="app-modal-card app-modal-card--wide" onClick={(event) => event.stopPropagation()}>
-            <div className="app-modal-header">
-              <h2>{editingId ? "Editar Ponto Institucional" : "Novo Ponto Institucional"}</h2>
-              <button type="button" className="app-modal-close btn-with-icon btn-action-close" onClick={handleRequestCloseModal}>Fechar</button>
-            </div>
-
-            <form className="company-form" onSubmit={handleSubmit}>
-              <div className="form-grid">
-                <label>
-                  Nome
-                  <input
-                    type="text"
-                    value={formData.nome}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, nome: event.target.value }))}
-                    maxLength={180}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Tipo
-                  <select
-                    value={formData.tipo}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, tipo: Number(event.target.value) }))}
-                  >
-                    {TIPO_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Cor do marcador
-                  <div className={styles["color-field-group"]}>
-                    <input
-                      type="color"
-                      value={formData.corMarcador}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, corMarcador: event.target.value }))}
-                    />
-                    <input
-                      type="text"
-                      value={formData.corMarcador}
-                      onChange={(event) => setFormData((prev) => ({ ...prev, corMarcador: event.target.value }))}
-                      maxLength={20}
-                      required
-                    />
-                  </div>
-                </label>
-
-                <label>
-                  Ícone do marcador
-                  <input
-                    type="text"
-                    value={formData.iconeMarcador}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, iconeMarcador: event.target.value }))}
-                    maxLength={60}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Ordem de exibição
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.ordemExibicao}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, ordemExibicao: Number(event.target.value) }))}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Latitude
-                  <input
-                    type="number"
-                    step="0.000001"
-                    min={-90}
-                    max={90}
-                    value={formData.latitude}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, latitude: Number(event.target.value) }))}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Longitude
-                  <input
-                    type="number"
-                    step="0.000001"
-                    min={-180}
-                    max={180}
-                    value={formData.longitude}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, longitude: Number(event.target.value) }))}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Contato nome
-                  <input
-                    type="text"
-                    value={formData.contatoNome}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, contatoNome: event.target.value }))}
-                    maxLength={180}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Contato telefone
-                  <input
-                    type="text"
-                    value={formData.contatoTelefone}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, contatoTelefone: event.target.value }))}
-                    maxLength={20}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Contato email
-                  <input
-                    type="email"
-                    value={formData.contatoEmail}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, contatoEmail: event.target.value }))}
-                    maxLength={150}
-                    required
-                  />
-                </label>
-              </div>
-
-              <label>
-                Endereço
-                <input
-                  type="text"
-                  value={formData.endereco}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, endereco: event.target.value }))}
-                  maxLength={300}
-                  required
-                />
-              </label>
-
-              <label>
-                Descrição
-                <input
-                  type="text"
-                  value={formData.descricao}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, descricao: event.target.value }))}
-                  maxLength={400}
-                  required
-                />
-              </label>
-
-              <label>
-                Atividades disponíveis
-                <input
-                  type="text"
-                  value={formData.atividadesDisponiveis}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, atividadesDisponiveis: event.target.value }))}
-                  maxLength={300}
-                  required
-                />
-              </label>
-
-              <label>
-                Equipe de gestão
-                <input
-                  type="text"
-                  value={formData.equipeGestao}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, equipeGestao: event.target.value }))}
-                  maxLength={250}
-                  required
-                />
-              </label>
-
-              <label>
-                Foto do responsável (URL)
-                <input
-                  type="text"
-                  value={formData.responsavelFotoUrl}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, responsavelFotoUrl: event.target.value }))}
-                  maxLength={500}
-                  placeholder="https://... ou /uploads/..."
-                />
-              </label>
-
-              <label>
-                Upload da foto do responsável
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  onChange={(event) => handleUploadImagem(event, "foto")}
-                  disabled={uploadingFoto || submitting}
-                />
-                {uploadingFoto && <small>Enviando foto...</small>}
-              </label>
-
-              {formData.responsavelFotoUrl && (
-                <div className={styles["upload-preview"]}>
-                  <span>Pré-visualização da foto do responsável</span>
-                  <img src={staticUrl(formData.responsavelFotoUrl)} alt="Foto do responsável" loading="lazy" />
-                </div>
-              )}
-
-              <label>
-                Logo do ponto (URL)
-                <input
-                  type="text"
-                  value={formData.logoUrl}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, logoUrl: event.target.value }))}
-                  maxLength={500}
-                  placeholder="https://... ou /uploads/..."
-                />
-              </label>
-
-              <label>
-                Upload do logo
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  onChange={(event) => handleUploadImagem(event, "logo")}
-                  disabled={uploadingLogo || submitting}
-                />
-                {uploadingLogo && <small>Enviando logo...</small>}
-              </label>
-
-              {formData.logoUrl && (
-                <div className={`${styles["upload-preview"]} ${styles["upload-preview--logo"]}`}>
-                  <span>Pré-visualização do logo</span>
-                  <img src={staticUrl(formData.logoUrl)} alt="Logo do ponto" loading="lazy" />
-                </div>
-              )}
-
-              <label>
-                Foto principal do card (URL)
-                <input
-                  type="text"
-                  value={formData.cardFotoUrl}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, cardFotoUrl: event.target.value }))}
-                  maxLength={500}
-                  placeholder="https://... ou /uploads/..."
-                />
-              </label>
-
-              <label>
-                Upload da foto principal do card
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/svg+xml"
-                  onChange={(event) => handleUploadImagem(event, "card")}
-                  disabled={uploadingCard || submitting}
-                />
-                {uploadingCard && <small>Enviando imagem de card...</small>}
-              </label>
-
-              {formData.cardFotoUrl && (
-                <div className={`${styles["upload-preview"]} ${styles["upload-preview--cover"]}`}>
-                  <span>Pré-visualização da imagem do card</span>
-                  <img src={staticUrl(formData.cardFotoUrl)} alt="Foto principal do card" loading="lazy" />
-                </div>
-              )}
-
-              <div className="company-form-actions">
-                <button type="submit" className="btn-with-icon btn-action-save" disabled={submitting}>
-                  {submitting ? "Salvando..." : editingId ? "Salvar Alterações" : "Cadastrar Ponto"}
-                </button>
-                <button type="button" className="ghost btn-with-icon btn-action-cancel" onClick={handleRequestCloseModal} disabled={submitting}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <PontoInstitucionalFormModal
+        isOpen={isModalOpen}
+        editingId={editingId}
+        formData={formData}
+        setFormData={setFormData}
+        submitting={submitting}
+        uploadingFoto={uploadingFoto}
+        uploadingLogo={uploadingLogo}
+        uploadingCard={uploadingCard}
+        onSubmit={handleSubmit}
+        onClose={handleRequestCloseModal}
+        onUploadImagem={handleUploadImagem}
+      />
     </section>
   );
 }
