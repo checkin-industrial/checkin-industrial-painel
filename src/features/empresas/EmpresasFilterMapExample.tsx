@@ -11,6 +11,10 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { createEmpresaMarkerIcon } from "./EmpresaMarker";
 import { useDraggable } from "../../shared/hooks/useDraggable";
 import { useAuth } from "../../shared/auth/AuthContext";
+import { MapContextProvider, type MapContextValue } from "./MapContext";
+import { FilterPanel } from "./components/FilterPanel";
+import { NeighborhoodReportPanel } from "./components/NeighborhoodReportPanel";
+import { MapLegend } from "./components/MapLegend";
 import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
@@ -31,66 +35,19 @@ import {
   type PontoInstitucionalMapItem,
 } from "../pontosInstitucionais/markerHelpers";
 
-type EmpresaFilterMapItem = {
-  id: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  descricaoCnae: string;
-  setor: string;
-  porte: string;
-  telefone: string;
-  cep: string;
-  municipio: string;
-  matrizOuFilial: string;
-  latitude: number;
-  longitude: number;
-};
-
-type EmpresaVizinhancaBase = {
-  id: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  setor: string;
-  numeroFuncionarios: number;
-  municipio: string;
-  latitude: number;
-  longitude: number;
-};
-
-type EmpresaVizinha = {
-  id: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  setor: string;
-  numeroFuncionarios: number;
-  municipio: string;
-  distanciaMetros: number;
-  mesmoCnae: boolean;
-  mesmoSetor: boolean;
-};
-
-type EmpresaVizinhancaResponse = {
-  empresaBase: EmpresaVizinhancaBase;
-  empresasProximas: EmpresaVizinha[];
-};
-
-// Types movidos pra ../pontosInstitucionais/markerHelpers.ts (PontoInstitucionalMapItem)
-// e ./MapHelpers.tsx (LeafletHeatLayer, HeatmapPointTuple, LatLngTuple) - re-importados acima.
-
-type HeatmapPointApi = {
-  latitude: number;
-  longitude: number;
-  peso: number;
-};
-
-
-type MapTargetPoint = {
-  id: string;
-  nome: string;
-  latitude: number;
-  longitude: number;
-  requestId: number;
-};
+// Types movidos pra ./types.ts (compartilhados com sub-componentes).
+// MapHelpers.tsx mantem LeafletHeatLayer, HeatmapPointTuple, LatLngTuple.
+import type {
+  EmpresaFilterMapItem,
+  EmpresaVizinhancaResponse,
+  HeatmapPointApi,
+  MapTargetPoint,
+  ReportSectionKey,
+  FilterFormState,
+  PontoInstitucionalFilterState,
+  CnaeOption,
+  LayerToggleState,
+} from "./types";
 
 type EmpresasFilterMapExampleProps = {
   mapTargetPoint?: MapTargetPoint | null;
@@ -98,35 +55,6 @@ type EmpresasFilterMapExampleProps = {
   // modo de edicao. Quando definida + usuario autenticado, o painel de
   // Relatorio mostra um botao "Editar cadastro" no card da empresa base.
   onAdminEditEmpresa?: (empresaId: string) => void;
-};
-
-type ReportSectionKey = "proximas" | "cnae" | "setor";
-
-type FilterFormState = {
-  nomeFantasia: string;
-  setor: string;
-  porte: string;
-  cnae: string;
-  municipio: string;
-  situacao: string;
-};
-
-type PontoInstitucionalFilterState = {
-  termo: string;
-  tipo: string;
-};
-
-type CnaeOption = {
-  value: string;
-  label: string;
-};
-
-type LayerToggleState = {
-  heatmap: boolean;
-  marcadores: boolean;
-  raioAnalise: boolean;
-  rotulosEmpresas: boolean;
-  pontosInstitucionais: boolean;
 };
 
 // Acima desse N de markers visiveis, agrupa em clusters automaticamente.
@@ -777,505 +705,126 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   const filtersPanelDraggable = useDraggable("filters-panel");
   const reportPanelDraggable = useDraggable("report-panel");
 
+  // Bundle do state para sub-componentes via Context. Memo evita value novo
+  // a cada render (re-render desnecessario nos consumers).
+  const mapContextValue: MapContextValue = useMemo(
+    () => ({
+      empresas,
+      pontosInstitucionais,
+      vizinhanca,
+      reportLoading,
+      reportError,
+      filters,
+      setFilters,
+      empresaBuscaAtiva,
+      setEmpresaBuscaAtiva,
+      cnaeOptions,
+      municipioOptions,
+      pontoFilters,
+      setPontoFilters,
+      pontosBuscaAtiva,
+      setPontosBuscaAtiva,
+      selectedEmpresaId,
+      setSelectedEmpresaId,
+      selectedPontoInstitucionalId,
+      setSelectedPontoInstitucionalId,
+      layerToggles,
+      setLayerToggles,
+      panelsVisible,
+      setPanelsVisible,
+      filtersCollapsed,
+      setFiltersCollapsed,
+      reportCollapsed,
+      setReportCollapsed,
+      empresaFiltersCollapsed,
+      setEmpresaFiltersCollapsed,
+      pontosFiltersCollapsed,
+      setPontosFiltersCollapsed,
+      empresaFiltersVisible,
+      setEmpresaFiltersVisible,
+      pontosFiltersVisible,
+      setPontosFiltersVisible,
+      collapsedReportSections,
+      setCollapsedReportSections,
+      userLocation,
+      setUserLocation,
+      locationActive,
+      setLocationActive,
+      routeEnabled,
+      setRouteEnabled,
+      routePath,
+      setRoutePath,
+      routeLoading,
+      setRouteLoading,
+      routeError,
+      setRouteError,
+      routeInfo,
+      setRouteInfo,
+      onAdminEditEmpresa,
+    }),
+    [
+      empresas,
+      pontosInstitucionais,
+      vizinhanca,
+      reportLoading,
+      reportError,
+      filters,
+      empresaBuscaAtiva,
+      cnaeOptions,
+      municipioOptions,
+      pontoFilters,
+      pontosBuscaAtiva,
+      selectedEmpresaId,
+      selectedPontoInstitucionalId,
+      layerToggles,
+      panelsVisible,
+      filtersCollapsed,
+      reportCollapsed,
+      empresaFiltersCollapsed,
+      pontosFiltersCollapsed,
+      empresaFiltersVisible,
+      pontosFiltersVisible,
+      collapsedReportSections,
+      userLocation,
+      locationActive,
+      routeEnabled,
+      routePath,
+      routeLoading,
+      routeError,
+      routeInfo,
+      onAdminEditEmpresa,
+    ],
+  );
+
   return (
+    <MapContextProvider value={mapContextValue}>
     <section className="map-dashboard-layout">
       <section className="map-main-panel">
         <div className={isMapFullscreen ? "map-stage is-fullscreen" : "map-stage"} ref={mapStageRef}>
 
-          {panelsVisible.filtros && (
-            <aside className="map-right-sidebar map-right-sidebar--animated">
-              <form 
-                ref={filtersPanelDraggable.ref as React.RefObject<HTMLFormElement>}
-                className={filtersCollapsed ? (filtersPanelDraggable.isDragging ? "filters-panel map-side-panel map-side-panel--filters collapsed draggable-panel dragging" : "filters-panel map-side-panel map-side-panel--filters collapsed draggable-panel") : (filtersPanelDraggable.isDragging ? "filters-panel map-side-panel map-side-panel--filters draggable-panel dragging" : "filters-panel map-side-panel map-side-panel--filters draggable-panel")}
-            >
-              <div 
-                className="panel-toggle-header"
-                onMouseDown={filtersPanelDraggable.handleMouseDown}
-                style={{ cursor: filtersPanelDraggable.isDragging ? "grabbing" : "grab" }}
-              >
-                <h2>Filtros</h2>
-                <button
-                  type="button"
-                  className="panel-icon-btn"
-                  onMouseDown={(event) => event.stopPropagation()}
-                  onClick={() => setFiltersCollapsed((prev) => !prev)}
-                  aria-expanded={!filtersCollapsed}
-                  aria-label={filtersCollapsed ? "Expandir painel de filtros" : "Minimizar painel de filtros"}
-                  title={filtersCollapsed ? "Expandir" : "Minimizar"}
-                >
-                  <span aria-hidden="true">{filtersCollapsed ? "+" : "-"}</span>
-                </button>
-              </div>
+          <FilterPanel
+            draggable={filtersPanelDraggable}
+            onFilterChange={handleFilterChange}
+            onPontoFilterChange={handlePontoFilterChange}
+            onToggleEmpresaBusca={toggleEmpresaBusca}
+            onTogglePontosBusca={togglePontosBusca}
+            onClear={handleClear}
+            loading={loading}
+            error={error}
+            pontosFiltradosCount={pontosInstitucionaisFiltrados.length}
+          />
 
-              {!filtersCollapsed && (
-                <>
-                  <input
-                    type="search"
-                    className="filters-panel__search"
-                    value={filters.nomeFantasia}
-                    onChange={(event) => handleFilterChange("nomeFantasia", event.target.value)}
-                    placeholder="Buscar empresa por nome fantasia"
-                    aria-label="Buscar empresa por nome fantasia"
-                    disabled={!empresaBuscaAtiva}
-                  />
 
-                  <div className="filters-panel__content">
-                  {(!empresaFiltersVisible || !pontosFiltersVisible) && (
-                    <div className="filters-panel__restore-row">
-                      {!empresaFiltersVisible && (
-                        <button type="button" className="restore-box-btn" onClick={() => setEmpresaFiltersVisible(true)}>
-                          Mostrar Empresas
-                        </button>
-                      )}
-                      {!pontosFiltersVisible && (
-                        <button type="button" className="restore-box-btn" onClick={() => setPontosFiltersVisible(true)}>
-                          Mostrar Pontos Turísticos
-                        </button>
-                      )}
-                    </div>
-                  )}
-
-                  {empresaFiltersVisible && (
-                    <section className={empresaFiltersCollapsed ? "filters-box collapsed" : "filters-box"}>
-                      <header className="filters-box__header">
-                        <h3>Empresas</h3>
-                        <div className="filters-box__actions">
-                          <button
-                            type="button"
-                            className="panel-icon-btn"
-                            onClick={() => setEmpresaFiltersCollapsed((prev) => !prev)}
-                            aria-expanded={!empresaFiltersCollapsed}
-                            aria-label={empresaFiltersCollapsed ? "Expandir caixa de filtros de empresas" : "Minimizar caixa de filtros de empresas"}
-                            title={empresaFiltersCollapsed ? "Expandir" : "Minimizar"}
-                          >
-                            <span aria-hidden="true">{empresaFiltersCollapsed ? "+" : "-"}</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="panel-icon-btn panel-icon-btn--danger"
-                            onClick={() => setEmpresaFiltersVisible(false)}
-                            aria-label="Fechar caixa de filtros de empresas"
-                            title="Fechar"
-                          >
-                            <span aria-hidden="true">x</span>
-                          </button>
-                        </div>
-                      </header>
-
-                      {!empresaFiltersCollapsed && (
-                        <>
-
-                  <label>
-                    Setor
-                    <select
-                      value={filters.setor}
-                      onChange={(event) => handleFilterChange("setor", event.target.value)}
-                      disabled={!empresaBuscaAtiva}
-                    >
-                      {SETOR_OPTIONS.map((option) => (
-                        <option key={option.value || "all"} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Porte
-                    <select
-                      value={filters.porte}
-                      onChange={(event) => handleFilterChange("porte", event.target.value)}
-                      disabled={!empresaBuscaAtiva}
-                    >
-                      {PORTE_OPTIONS.map((option) => (
-                        <option key={option.value || "all"} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    CNAE
-                    <select
-                      value={filters.cnae}
-                      onChange={(event) => handleFilterChange("cnae", event.target.value)}
-                      disabled={!empresaBuscaAtiva}
-                    >
-                      {cnaeOptions.map((option) => (
-                        <option key={option.value || "all"} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Município
-                    <select
-                      value={filters.municipio}
-                      onChange={(event) => handleFilterChange("municipio", event.target.value)}
-                      disabled={!empresaBuscaAtiva}
-                    >
-                      <option value="">Todos</option>
-                      {municipioOptions.map((municipio) => (
-                        <option key={municipio} value={municipio}>
-                          {municipio}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <label>
-                    Situação
-                    <select
-                      value={filters.situacao}
-                      onChange={(event) => handleFilterChange("situacao", event.target.value)}
-                      disabled={!empresaBuscaAtiva}
-                    >
-                      {SITUACAO_OPTIONS.map((option) => (
-                        <option key={option.value || "all"} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <p className="status-info">Marcadores exibidos: {empresas.length}</p>
-
-                        </>
-                      )}
-
-                      <footer className="filters-box__footer">
-                        <button type="button" className="filters-search-toggle" onClick={toggleEmpresaBusca}>
-                          {empresaBuscaAtiva ? "Desativar busca" : "Ativar busca"}
-                        </button>
-                      </footer>
-                    </section>
-                  )}
-
-                  {pontosFiltersVisible && (
-                    <section className={pontosFiltersCollapsed ? "filters-box collapsed" : "filters-box"}>
-                      <header className="filters-box__header">
-                        <h3>Pontos Institucionais</h3>
-                        <div className="filters-box__actions">
-                          <button
-                            type="button"
-                            className="panel-icon-btn"
-                            onClick={() => setPontosFiltersCollapsed((prev) => !prev)}
-                            aria-expanded={!pontosFiltersCollapsed}
-                            aria-label={pontosFiltersCollapsed ? "Expandir caixa de filtros de pontos institucionais" : "Minimizar caixa de filtros de pontos institucionais"}
-                            title={pontosFiltersCollapsed ? "Expandir" : "Minimizar"}
-                          >
-                            <span aria-hidden="true">{pontosFiltersCollapsed ? "+" : "-"}</span>
-                          </button>
-                          <button
-                            type="button"
-                            className="panel-icon-btn panel-icon-btn--danger"
-                            onClick={() => setPontosFiltersVisible(false)}
-                            aria-label="Fechar caixa de filtros de pontos institucionais"
-                            title="Fechar"
-                          >
-                            <span aria-hidden="true">x</span>
-                          </button>
-                        </div>
-                      </header>
-
-                      {!pontosFiltersCollapsed && (
-                        <>
-
-                  <label>
-                    Buscar ponto institucional
-                    <input
-                      type="search"
-                      value={pontoFilters.termo}
-                      onChange={(event) => handlePontoFilterChange("termo", event.target.value)}
-                      placeholder="Nome, endereço, contato ou atividade"
-                      disabled={!pontosBuscaAtiva}
-                    />
-                  </label>
-
-                  <label>
-                    Tipo de ponto institucional
-                    <select
-                      value={pontoFilters.tipo}
-                      onChange={(event) => handlePontoFilterChange("tipo", event.target.value)}
-                      disabled={!pontosBuscaAtiva}
-                    >
-                      {PONTO_INSTITUCIONAL_TIPO_OPTIONS.map((option) => (
-                        <option key={option.value || "all"} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-
-                  <p className="status-info">Pontos exibidos: {pontosInstitucionaisFiltrados.length}</p>
-
-                        </>
-                      )}
-
-                      <footer className="filters-box__footer">
-                        <button type="button" className="filters-search-toggle" onClick={togglePontosBusca}>
-                          {pontosBuscaAtiva ? "Desativar busca" : "Ativar busca"}
-                        </button>
-                      </footer>
-                    </section>
-                  )}
-
-                  <div className="filters-actions">
-                    <button type="button" onClick={handleClear} disabled={loading}>
-                      Limpar
-                    </button>
-                  </div>
-
-                  {error && <p className="status-error">{error}</p>}
-                  </div>
-
-                </>
-              )}
-            </form>
-            </aside>
-          )}
-
-          {panelsVisible.relatorio && possuiSelecaoNoMapa && (
-            <aside 
-              key={`report-${selectedEmpresaId ?? "none"}-${selectedPontoInstitucionalId ?? "none"}`}
-              ref={reportPanelDraggable.ref}
-              className={reportCollapsed ? (reportPanelDraggable.isDragging ? "map-left-sidebar map-left-sidebar--selection map-left-sidebar--animated report-panel map-side-panel map-side-panel--report collapsed draggable-panel dragging" : "map-left-sidebar map-left-sidebar--selection map-left-sidebar--animated report-panel map-side-panel map-side-panel--report collapsed draggable-panel") : (reportPanelDraggable.isDragging ? "map-left-sidebar map-left-sidebar--selection map-left-sidebar--animated report-panel map-side-panel map-side-panel--report draggable-panel dragging" : "map-left-sidebar map-left-sidebar--selection map-left-sidebar--animated report-panel map-side-panel map-side-panel--report draggable-panel")}
-            >
-              <header 
-                className="report-header panel-toggle-header"
-                onMouseDown={reportPanelDraggable.handleMouseDown}
-                style={{ cursor: reportPanelDraggable.isDragging ? "grabbing" : "grab" }}
-              >
-                <div>
-                  <h3>Relatório de Vizinhança</h3>
-                  {!reportCollapsed && (
-                    <p>
-                      {selectedPontoInstitucionalId
-                        ? "Detalhes do ponto institucional"
-                        : "Empresas em um raio de 5 km"}
-                    </p>
-                  )}
-                </div>
-                <div className="panel-header-actions" onMouseDown={(event) => event.stopPropagation()}>
-                  <button
-                    type="button"
-                    className="panel-icon-btn panel-icon-btn--inverse panel-icon-btn--danger"
-                    onClick={() => setPanelsVisible((prev) => ({ ...prev, relatorio: false }))}
-                    aria-label="Fechar relatório da vizinhança"
-                    title="Fechar"
-                  >
-                    <span aria-hidden="true">x</span>
-                  </button>
-                </div>
-              </header>
-
-              {!reportCollapsed && (
-                <>
-                  {routeEnabled && (
-                    <section className="report-block">
-                      <h4>Rota da sua localização</h4>
-                      {routeLoading && <p className="report-empty-state">Calculando trajeto...</p>}
-                      {!routeLoading && routeError && <p className="status-error">{routeError}</p>}
-                      {!routeLoading && !routeError && routeInfo && (
-                        <div className="report-company-card">
-                          <span><strong>Distância:</strong> {routeInfo.distanceKm.toFixed(2)} km</span>
-                          <span><strong>Tempo estimado:</strong> {routeInfo.durationMin.toFixed(0)} min</span>
-                        </div>
-                      )}
-                    </section>
-                  )}
-
-                  <section className="report-block">
-                    <h4>Ponto institucional selecionado</h4>
-                    {!selectedPontoInstitucionalId && <p className="report-empty-state">Clique em um ponto institucional para ver detalhes de parceria e contato.</p>}
-                    {pontoInstitucionalSelecionado && (
-                      <div className="report-company-card report-company-card--institutional">
-                        {pontoInstitucionalSelecionado.cardFotoUrl && (
-                          <img
-                            className="report-institution-card-image"
-                            src={staticUrl(pontoInstitucionalSelecionado.cardFotoUrl)}
-                            alt={`Imagem de capa de ${pontoInstitucionalSelecionado.nome}`}
-                            loading="lazy"
-                          />
-                        )}
-                        {pontoInstitucionalSelecionado.logoUrl && (
-                          <img
-                            className="report-institution-logo"
-                            src={staticUrl(pontoInstitucionalSelecionado.logoUrl)}
-                            alt={`Logo de ${pontoInstitucionalSelecionado.nome}`}
-                            loading="lazy"
-                          />
-                        )}
-                        <strong>{pontoInstitucionalSelecionado.nome}</strong>
-                        <span>
-                          <strong>Tipo:</strong>{" "}
-                          <span className={getPontoInstitucionalTipoBadgeClass(pontoInstitucionalSelecionado.tipo)}>
-                            <span className={getPontoInstitucionalTipoIconClass(pontoInstitucionalSelecionado.tipo)} aria-hidden="true">
-                              {getPontoInstitucionalTipoIcon(pontoInstitucionalSelecionado.tipo)}
-                            </span>
-                            {getPontoInstitucionalTipoLabel(pontoInstitucionalSelecionado.tipo)}
-                          </span>
-                        </span>
-                        <span>{pontoInstitucionalSelecionado.descricao}</span>
-                        <div className="report-address-row">
-                          <span><strong>Endereço:</strong> {pontoInstitucionalSelecionado.endereco}</span>
-                          <button
-                            type="button"
-                            className={routeEnabled ? "report-address-route-btn active" : "report-address-route-btn"}
-                            onClick={handleRouteFromReportAddress}
-                            disabled={routeLoading}
-                            aria-label={`Traçar rota até ${pontoInstitucionalSelecionado.nome}`}
-                            title={routeLoading ? "Calculando rota..." : "Traçar rota até este endereço"}
-                          >
-                            <span className="report-route-icon" aria-hidden="true" />
-                          </button>
-                        </div>
-                        <span><strong>Atividades:</strong> {pontoInstitucionalSelecionado.atividadesDisponiveis}</span>
-                        <span><strong>Equipe de gestão:</strong> {pontoInstitucionalSelecionado.equipeGestao}</span>
-                        <span><strong>Contato:</strong> {pontoInstitucionalSelecionado.contatoNome}</span>
-                        <span><strong>Telefone:</strong> {pontoInstitucionalSelecionado.contatoTelefone}</span>
-                        <span><strong>Email:</strong> {pontoInstitucionalSelecionado.contatoEmail}</span>
-                        {pontoInstitucionalSelecionado.responsavelFotoUrl && (
-                          <a
-                            className="report-link"
-                            href={staticUrl(pontoInstitucionalSelecionado.responsavelFotoUrl)}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            <img
-                              className="report-contact-photo"
-                              src={staticUrl(pontoInstitucionalSelecionado.responsavelFotoUrl)}
-                              alt={`Foto de ${pontoInstitucionalSelecionado.contatoNome || "responsável"}`}
-                              loading="lazy"
-                            />
-                            <span>Foto da pessoa responsável</span>
-                          </a>
-                        )}
-                      </div>
-                    )}
-                  </section>
-
-                  {exibirBlocosVizinhanca && (
-                    <>
-                      <section className="report-block">
-                        <h4>Empresa base</h4>
-                        {!selectedEmpresaId && <p className="report-empty-state">Clique em um marcador para analisar a vizinhança em 5 km.</p>}
-                        {selectedEmpresaId && reportLoading && <p className="report-empty-state">Carregando vizinhança...</p>}
-                        {selectedEmpresaId && reportError && <p className="status-error">{reportError}</p>}
-                        {!reportLoading && !reportError && vizinhanca?.empresaBase && (
-                          <div className="report-company-card">
-                            <strong>{vizinhanca.empresaBase.nomeFantasia}</strong>
-                            <span>CNAE: {vizinhanca.empresaBase.cnaePrincipal}</span>
-                            <span>Setor: {vizinhanca.empresaBase.setor}</span>
-                            <span>Município: {vizinhanca.empresaBase.municipio}</span>
-                            <span>Funcionários: {vizinhanca.empresaBase.numeroFuncionarios}</span>
-                            {isAuthenticated && onAdminEditEmpresa && vizinhanca.empresaBase.id && (
-                              <button
-                                type="button"
-                                className="ghost btn-with-icon btn-action-edit btn-edit-empresa-from-map"
-                                onClick={() => onAdminEditEmpresa(vizinhanca.empresaBase.id)}
-                              >
-                                Editar cadastro
-                              </button>
-                            )}
-                          </div>
-                        )}
-                      </section>
-
-                      <section className="report-block">
-                        <div className="report-section-header">
-                          <h4>Empresas proximas ({empresasProximas.length})</h4>
-                          <button
-                            type="button"
-                            className="report-section-toggle"
-                            onClick={() => toggleReportSection("proximas")}
-                            aria-expanded={!collapsedReportSections.proximas}
-                            aria-label={collapsedReportSections.proximas ? "Expandir empresas proximas" : "Colapsar empresas proximas"}
-                          >
-                            {collapsedReportSections.proximas ? "+" : "-"}
-                          </button>
-                        </div>
-                        {!collapsedReportSections.proximas && (
-                          <ol className="report-list">
-                            {!reportLoading && !reportError && empresasProximas.map((empresa) => (
-                              <li key={empresa.id}>
-                                <strong>{empresa.nomeFantasia}</strong>
-                                <br />
-                                {empresa.setor} | {empresa.cnaePrincipal} | {empresa.municipio}
-                                <br />
-                                Funcionários: {empresa.numeroFuncionarios} | Distância: {(empresa.distanciaMetros / 1000).toFixed(2)} km
-                              </li>
-                            ))}
-                            {!reportLoading && !reportError && selectedEmpresaId && empresasProximas.length === 0 && <li>Nenhuma empresa encontrada dentro do raio de 5 km.</li>}
-                          </ol>
-                        )}
-                      </section>
-
-                      <section className="report-block">
-                        <div className="report-section-header">
-                          <h4>Mesmo CNAE ({empresasMesmoCnae.length})</h4>
-                          <button
-                            type="button"
-                            className="report-section-toggle"
-                            onClick={() => toggleReportSection("cnae")}
-                            aria-expanded={!collapsedReportSections.cnae}
-                            aria-label={collapsedReportSections.cnae ? "Expandir empresas do mesmo CNAE" : "Colapsar empresas do mesmo CNAE"}
-                          >
-                            {collapsedReportSections.cnae ? "+" : "-"}
-                          </button>
-                        </div>
-                        {!collapsedReportSections.cnae && (
-                          <ol className="report-list">
-                            {!reportLoading && !reportError && empresasMesmoCnae.map((empresa) => (
-                              <li key={empresa.id}>{empresa.nomeFantasia}: {(empresa.distanciaMetros / 1000).toFixed(2)} km</li>
-                            ))}
-                            {!reportLoading && !reportError && selectedEmpresaId && empresasMesmoCnae.length === 0 && <li>Nenhuma empresa com o mesmo CNAE no raio atual.</li>}
-                          </ol>
-                        )}
-                      </section>
-
-                      <section className="report-block">
-                        <div className="report-section-header">
-                          <h4>Mesmo setor ({empresasMesmoSetor.length})</h4>
-                          <button
-                            type="button"
-                            className="report-section-toggle"
-                            onClick={() => toggleReportSection("setor")}
-                            aria-expanded={!collapsedReportSections.setor}
-                            aria-label={collapsedReportSections.setor ? "Expandir empresas do mesmo setor" : "Colapsar empresas do mesmo setor"}
-                          >
-                            {collapsedReportSections.setor ? "+" : "-"}
-                          </button>
-                        </div>
-                        {!collapsedReportSections.setor && (
-                          <ol className="report-list">
-                            {!reportLoading && !reportError && empresasMesmoSetor.map((empresa) => (
-                              <li key={empresa.id}>{empresa.nomeFantasia}: {(empresa.distanciaMetros / 1000).toFixed(2)} km</li>
-                            ))}
-                            {!reportLoading && !reportError && selectedEmpresaId && empresasMesmoSetor.length === 0 && <li>Nenhuma empresa do mesmo setor no raio atual.</li>}
-                          </ol>
-                        )}
-                      </section>
-
-                      <div className="report-metrics">
-                        <div>
-                          <span>Distância média</span>
-                          <strong>{avgDistanceKm.toFixed(1)} km</strong>
-                        </div>
-                        <div>
-                          <span>Empresas na área</span>
-                          <strong>{empresasProximas.length}</strong>
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </>
-              )}
-            </aside>
-          )}
+          <NeighborhoodReportPanel
+            draggable={reportPanelDraggable}
+            possuiSelecao={possuiSelecaoNoMapa}
+            pontoInstitucionalSelecionado={pontoInstitucionalSelecionado}
+            empresasMesmoCnae={empresasMesmoCnae}
+            empresasMesmoSetor={empresasMesmoSetor}
+            avgDistanceKm={avgDistanceKm}
+            onRouteFromAddress={handleRouteFromReportAddress}
+            onToggleReportSection={toggleReportSection}
+          />
 
           <div className="map-wrapper">
             {(loading || heatmapLoading) && (
@@ -1440,118 +989,17 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
             </MapContainer>
           </div>
 
-          <div className="map-legend">
-            <button
-              type="button"
-              className={layerToggles.heatmap ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={() => toggleLayer("heatmap")}
-              aria-pressed={layerToggles.heatmap}
-              aria-label="Mapa de Calor - Densidade de Empresas"
-              title="Mapa de Calor: visualiza a densidade e concentração de empresas na região"
-            >
-              <i className="legend-color heat" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className={layerToggles.marcadores ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={() => toggleLayer("marcadores")}
-              aria-pressed={layerToggles.marcadores}
-              aria-label="Marcadores de Empresas - Localização Exata"
-              title="Marcadores: exibe a localização de cada empresa no mapa"
-            >
-              <i className="legend-color marker" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className={layerToggles.raioAnalise ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={() => toggleLayer("raioAnalise")}
-              aria-pressed={layerToggles.raioAnalise}
-              aria-label="Raio de Análise - 5km ao Redor"
-              title="Raio de Análise: desenha um círculo de 5km ao redor de uma empresa selecionada"
-            >
-              <i className="legend-color radius" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className={layerToggles.rotulosEmpresas ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={() => toggleLayer("rotulosEmpresas")}
-              aria-pressed={layerToggles.rotulosEmpresas}
-              aria-label="Rótulos de Nomes"
-              disabled={!layerToggles.marcadores && !layerToggles.pontosInstitucionais}
-              title={
-                !layerToggles.marcadores && !layerToggles.pontosInstitucionais
-                  ? "Ative marcadores ou pontos institucionais primeiro para exibir rótulos"
-                  : "Rótulos: mostra os nomes das empresas e pontos turísticos no mapa"
-              }
-            >
-              <i className="legend-color label" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className={layerToggles.pontosInstitucionais ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={() => toggleLayer("pontosInstitucionais")}
-              aria-pressed={layerToggles.pontosInstitucionais}
-              aria-label="Pontos Institucionais e Turísticos"
-              title="Pontos Turísticos: exibe hotéis, atrativos, educação e outros pontos úteis"
-            >
-              <i className="legend-color institutional" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className={locationActive ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={toggleUserLocation}
-              aria-pressed={locationActive}
-              aria-label="Minha Localização - Ativar GPS"
-              title="Localização: permite visualizar sua posição atual no mapa e traçar rotas"
-            >
-              <i className="legend-color location" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className={routeEnabled ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={() => setRouteEnabled((prev) => !prev)}
-              aria-pressed={routeEnabled}
-              aria-label="Traçar Rota - Direcionamento"
-              title="Rota: calcula e desenha o trajeto de sua localização até o destino selecionado"
-            >
-              <i className="legend-color route" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className={isMapFullscreen ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={handleToggleFullscreen}
-              aria-pressed={isMapFullscreen}
-              aria-label={isMapFullscreen ? "Sair de Tela Cheia" : "Tela Cheia"}
-              title={isMapFullscreen ? "Clique para sair do modo tela cheia" : "Clique para ampliar o mapa em tela cheia"}
-            >
-              <i className="legend-color fullscreen" aria-hidden="true" />
-            </button>
-
-            <div className="legend-separator" />
-            <button
-              type="button"
-              className={panelsVisible.filtros ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={toggleFiltersPanel}
-              aria-pressed={panelsVisible.filtros}
-              aria-label={panelsVisible.filtros ? "Fechar Painel de Filtros" : "Abrir Painel de Filtros"}
-              title={panelsVisible.filtros ? "Filtros: clique para fechar o painel de filtros avançados" : "Filtros: clique para abrir o painel de filtros avançados (nome, setor, porte, etc)"}
-            >
-              <i className="legend-color filters" aria-hidden="true" />
-            </button>
-            <button
-              type="button"
-              className={panelsVisible.relatorio ? "legend-item legend-toggle icon-only active" : "legend-item legend-toggle icon-only"}
-              onClick={() => setPanelsVisible((prev) => ({ ...prev, relatorio: !prev.relatorio }))}
-              aria-pressed={panelsVisible.relatorio}
-              aria-label={panelsVisible.relatorio ? "Fechar Relatório da Vizinhança" : "Abrir Relatório da Vizinhança"}
-              title={panelsVisible.relatorio ? "Relatório: clique para fechar o painel de análise e detalhes" : "Relatório: clique para abrir o painel de análise da vizinhança"}
-            >
-              <i className="legend-color report" aria-hidden="true" />
-            </button>
-          </div>
+          <MapLegend
+            isMapFullscreen={isMapFullscreen}
+            onToggleLayer={toggleLayer}
+            onToggleUserLocation={toggleUserLocation}
+            onToggleFullscreen={handleToggleFullscreen}
+            onToggleFiltersPanel={toggleFiltersPanel}
+          />
         </div>
       </section>
 
     </section>
+    </MapContextProvider>
   );
 }
