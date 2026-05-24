@@ -31,66 +31,19 @@ import {
   type PontoInstitucionalMapItem,
 } from "../pontosInstitucionais/markerHelpers";
 
-type EmpresaFilterMapItem = {
-  id: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  descricaoCnae: string;
-  setor: string;
-  porte: string;
-  telefone: string;
-  cep: string;
-  municipio: string;
-  matrizOuFilial: string;
-  latitude: number;
-  longitude: number;
-};
-
-type EmpresaVizinhancaBase = {
-  id: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  setor: string;
-  numeroFuncionarios: number;
-  municipio: string;
-  latitude: number;
-  longitude: number;
-};
-
-type EmpresaVizinha = {
-  id: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  setor: string;
-  numeroFuncionarios: number;
-  municipio: string;
-  distanciaMetros: number;
-  mesmoCnae: boolean;
-  mesmoSetor: boolean;
-};
-
-type EmpresaVizinhancaResponse = {
-  empresaBase: EmpresaVizinhancaBase;
-  empresasProximas: EmpresaVizinha[];
-};
-
-// Types movidos pra ../pontosInstitucionais/markerHelpers.ts (PontoInstitucionalMapItem)
-// e ./MapHelpers.tsx (LeafletHeatLayer, HeatmapPointTuple, LatLngTuple) - re-importados acima.
-
-type HeatmapPointApi = {
-  latitude: number;
-  longitude: number;
-  peso: number;
-};
-
-
-type MapTargetPoint = {
-  id: string;
-  nome: string;
-  latitude: number;
-  longitude: number;
-  requestId: number;
-};
+// Types movidos pra ./types.ts (compartilhados com sub-componentes).
+// MapHelpers.tsx mantem LeafletHeatLayer, HeatmapPointTuple, LatLngTuple.
+import type {
+  EmpresaFilterMapItem,
+  EmpresaVizinhancaResponse,
+  HeatmapPointApi,
+  MapTargetPoint,
+  ReportSectionKey,
+  FilterFormState,
+  PontoInstitucionalFilterState,
+  CnaeOption,
+  LayerToggleState,
+} from "./types";
 
 type EmpresasFilterMapExampleProps = {
   mapTargetPoint?: MapTargetPoint | null;
@@ -98,35 +51,6 @@ type EmpresasFilterMapExampleProps = {
   // modo de edicao. Quando definida + usuario autenticado, o painel de
   // Relatorio mostra um botao "Editar cadastro" no card da empresa base.
   onAdminEditEmpresa?: (empresaId: string) => void;
-};
-
-type ReportSectionKey = "proximas" | "cnae" | "setor";
-
-type FilterFormState = {
-  nomeFantasia: string;
-  setor: string;
-  porte: string;
-  cnae: string;
-  municipio: string;
-  situacao: string;
-};
-
-type PontoInstitucionalFilterState = {
-  termo: string;
-  tipo: string;
-};
-
-type CnaeOption = {
-  value: string;
-  label: string;
-};
-
-type LayerToggleState = {
-  heatmap: boolean;
-  marcadores: boolean;
-  raioAnalise: boolean;
-  rotulosEmpresas: boolean;
-  pontosInstitucionais: boolean;
 };
 
 // Acima desse N de markers visiveis, agrupa em clusters automaticamente.
