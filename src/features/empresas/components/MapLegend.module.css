@@ -1,0 +1,329 @@
+/* Estilos da MapLegend (barra de toggles na borda do mapa: heatmap,
+   marcadores, raio, rotulos, pontos, localizacao, rota, fullscreen,
+   paineis). Classes filhas como .legend-color.heat ficam aqui porque
+   sao compostas - dependem das duas classes no mesmo escopo de module.
+
+   Importar via: import styles from "./MapLegend.module.css";
+   E usar styles["legend-color"] + styles["heat"] em template strings. */
+
+.map-legend {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 600;
+  border: 1px solid #b8c8df;
+  border-radius: 10px;
+  background: rgba(248, 251, 255, 0.94);
+  padding: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+  width: fit-content;
+  max-width: calc(100% - 700px);
+}
+
+.legend-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #243b5b;
+  font-size: 0.84rem;
+  font-weight: 600;
+}
+
+.legend-toggle {
+  border: 1px solid #a8bfdc;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #eef4ff;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.legend-toggle.active {
+  border-color: #4d7dba;
+  background: #dbeafe;
+}
+
+.legend-toggle:not(.active) {
+  opacity: 0.72;
+}
+
+.legend-toggle:hover {
+  opacity: 1;
+}
+
+.legend-toggle.icon-only {
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  padding: 0;
+  justify-content: center;
+}
+
+.legend-toggle:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.legend-color {
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  display: inline-block;
+  position: relative;
+  box-shadow: inset 0 0 0 1px rgba(15, 23, 42, 0.18);
+}
+
+.legend-toggle:not(.active) .legend-color {
+  filter: grayscale(0.9);
+  opacity: 0.55;
+}
+
+.legend-color.heat {
+  background: linear-gradient(90deg, #f6c40a 0%, #ff7a00 48%, #d90429 100%);
+}
+
+.legend-color.rail {
+  background: #374151;
+}
+
+.legend-color.road {
+  background: #f59e0b;
+}
+
+.legend-color.district {
+  background: #2563eb;
+}
+
+.legend-color.marker {
+  background: #0f766e;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+}
+
+.legend-color.marker::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.legend-color.radius {
+  border-radius: 50%;
+  border: 2px solid #7c3aed;
+  background: transparent;
+  box-shadow: none;
+}
+
+.legend-color.radius::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  border: 2px solid rgba(124, 58, 237, 0.55);
+}
+
+.legend-color.institutional {
+  background: #b91c1c;
+  transform: rotate(45deg);
+  border-radius: 4px;
+}
+
+.legend-color.institutional::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.legend-color.phones {
+  background: #0f766e;
+  border-radius: 999px;
+}
+
+.legend-color.phones::before {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 4px;
+  width: 8px;
+  height: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 3px;
+}
+
+.legend-color.phones::after {
+  content: "";
+  position: absolute;
+  left: 8px;
+  bottom: 3px;
+  width: 3px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 999px;
+}
+
+.legend-color.location {
+  background: #2563eb;
+  border-radius: 999px;
+}
+
+.legend-color.location::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border: 2px solid rgba(255, 255, 255, 0.95);
+  border-radius: 50%;
+  background: transparent;
+}
+
+.legend-color.location::before {
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+}
+
+.legend-color.route {
+  background: #1d4ed8;
+  border-radius: 4px;
+}
+
+.legend-color.route::before {
+  content: "";
+  position: absolute;
+  left: 3px;
+  right: 3px;
+  top: 8px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.95);
+  transform: rotate(-28deg);
+  border-radius: 999px;
+}
+
+.legend-color.route::after {
+  content: "";
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.95);
+  right: 3px;
+  top: 4px;
+  box-shadow: -8px 8px 0 rgba(255, 255, 255, 0.95);
+}
+
+.legend-color.fullscreen {
+  background: #0f172a;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.14);
+}
+
+.legend-color.fullscreen::before,
+.legend-color.fullscreen::after {
+  content: "";
+  position: absolute;
+  width: 6px;
+  height: 6px;
+  border-color: rgba(255, 255, 255, 0.95);
+}
+
+.legend-color.fullscreen::before {
+  top: 3px;
+  left: 3px;
+  border-top: 2px solid rgba(255, 255, 255, 0.95);
+  border-left: 2px solid rgba(255, 255, 255, 0.95);
+}
+
+.legend-color.fullscreen::after {
+  right: 3px;
+  bottom: 3px;
+  border-right: 2px solid rgba(255, 255, 255, 0.95);
+  border-bottom: 2px solid rgba(255, 255, 255, 0.95);
+}
+
+.legend-color.label {
+  background: #475569;
+  border-radius: 999px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.legend-color.label::after {
+  content: "Aa";
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #f8fafc;
+  font-size: 0.56rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+}
+
+.legend-separator {
+  width: 1px;
+  height: 24px;
+  background: #d1d5db;
+  margin: 0 4px;
+}
+
+.legend-color.filters {
+  background: #6366f1;
+  border-radius: 4px;
+}
+
+.legend-color.filters::after {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  right: 3px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 1px;
+}
+
+.legend-color.filters::before {
+  content: "";
+  position: absolute;
+  top: 8px;
+  left: 3px;
+  right: 3px;
+  height: 2px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 1px;
+}
+
+.legend-color.report {
+  background: #8b5cf6;
+  border-radius: 3px;
+}
+
+.legend-color.report::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border: 1.5px solid rgba(255, 255, 255, 0.9);
+  border-radius: 2px;
+}
+
+.legend-color.report::before {
+  content: "";
+  position: absolute;
+  top: 4px;
+  left: 3px;
+  right: 3px;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0.5px;
+}
