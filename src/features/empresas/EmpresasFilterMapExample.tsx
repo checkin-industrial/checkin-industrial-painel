@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
 import { Circle, MapContainer, TileLayer, ZoomControl } from "react-leaflet";
@@ -11,6 +11,9 @@ import { MapContext, type MapContextValue } from "./MapContext";
 import { useFiltrosEmpresas, INITIAL_PONTO_FILTERS } from "./hooks/useFiltrosEmpresas";
 import { useUserLocation } from "./hooks/useUserLocation";
 import { useRouteOSRM } from "./hooks/useRouteOSRM";
+import { useEmpresasMapData } from "./hooks/useEmpresasMapData";
+import { useMapFullscreen } from "./hooks/useMapFullscreen";
+import { useMapDeepLink } from "./hooks/useMapDeepLink";
 import { FilterPanel } from "./components/FilterPanel";
 import { NeighborhoodReportPanel } from "./components/NeighborhoodReportPanel";
 import { MapLegend } from "./components/MapLegend";
@@ -22,23 +25,18 @@ import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
   HeatmapLayer,
-  type HeatmapPointTuple,
   isCoordinateInsideViewportWindow,
   type LatLngTuple,
   MapFocusTarget,
   MapViewport,
 } from "./MapHelpers";
-import {
-  matchesPontoInstitucionalFilters,
-  type PontoInstitucionalMapItem,
-} from "../pontosInstitucionais/markerHelpers";
+import { matchesPontoInstitucionalFilters } from "../pontosInstitucionais/markerHelpers";
 
 // Types movidos pra ./types.ts (compartilhados com sub-componentes).
 // MapHelpers.tsx mantem LeafletHeatLayer, HeatmapPointTuple, LatLngTuple.
 import type {
   EmpresaFilterMapItem,
   EmpresaVizinhancaResponse,
-  HeatmapPointApi,
   MapTargetPoint,
   ReportSectionKey,
   FilterFormState,
@@ -102,19 +100,7 @@ function buildMunicipioOptions(empresas: EmpresaFilterMapItem[]) {
 
 // isCoordinateInsideViewportWindow, MapViewport, MapFocusTarget, HeatmapLayer
 // movidos para ./MapHelpers.tsx e re-importados no topo do arquivo.
-
-function buildQueryString(filters: FilterFormState) {
-  const params = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(filters)) {
-    const trimmed = value.trim();
-    if (trimmed) {
-      params.set(key, trimmed);
-    }
-  }
-
-  return params.toString();
-}
+// buildQueryString agora vive em hooks/useEmpresasMapData.ts (unico consumidor).
 
 export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }: EmpresasFilterMapExampleProps) {
   const {
@@ -147,7 +133,7 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     relatorio: true,
   });
   const [layerToggles, setLayerToggles] = useState<LayerToggleState>(INITIAL_LAYER_TOGGLES);
-  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const { mapStageRef, isMapFullscreen, handleToggleFullscreen } = useMapFullscreen();
   const [selectedEmpresaId, setSelectedEmpresaId] = useState<string | null>(null);
   const [selectedPontoInstitucionalId, setSelectedPontoInstitucionalId] = useState<string | null>(null);
   const {
@@ -165,72 +151,17 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     cnae: true,
     setor: true,
   });
-  const mapStageRef = useRef<HTMLDivElement | null>(null);
-  const lastMapTargetRequestRef = useRef<number | null>(null);
-
   const {
-    data: empresas = [],
-    isFetching: loading,
-    error: empresasQueryError,
-  } = useQuery({
-    queryKey: ["empresas", "filter", effectiveFilters],
-    queryFn: async () => {
-      // Widget publico sempre filtra Status=Ativo; empresas Inativo (soft-delete) e
-      // AguardandoRevisao (import nao aprovado) so aparecem na Gestao Admin.
-      const params = new URLSearchParams(buildQueryString(effectiveFilters));
-      params.set("status", "ativo");
-      const endpoint = `/api/empresas/filter?${params.toString()}`;
-      const data = await apiFetch<EmpresaFilterMapItem[]>("GET", endpoint);
-      return Array.isArray(data) ? data : [];
-    },
-  });
-
-  const error = empresasQueryError instanceof Error ? empresasQueryError.message : null;
-
-  const {
-    data: heatmapPoints = [],
-    isFetching: heatmapLoading,
-  } = useQuery({
-    queryKey: ["empresas", "heatmap", effectiveFilters.cnae.trim(), effectiveFilters.setor.trim()],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      const cnae = effectiveFilters.cnae.trim();
-      const setor = effectiveFilters.setor.trim();
-      if (cnae) params.set("cnae", cnae);
-      if (setor) params.set("setor", setor);
-      const endpoint = params.toString() ? `/api/analytics/heatmap?${params.toString()}` : "/api/analytics/heatmap";
-      try {
-        const data = await apiFetch<HeatmapPointApi[]>("GET", endpoint);
-        return (Array.isArray(data) ? data : [])
-          .filter((point) => isCoordinateInsideViewportWindow(point.latitude, point.longitude))
-          .map((point) => [point.latitude, point.longitude, Math.max(1, point.peso)] as HeatmapPointTuple);
-      } catch {
-        return [] as HeatmapPointTuple[];
-      }
-    },
-    enabled: layerToggles.heatmap,
-  });
-
-  const {
-    data: pontosInstitucionais = [],
-  } = useQuery({
-    queryKey: ["pontos-institucionais", "mapa", pontosTipoEfetivo.trim().toLowerCase()],
-    queryFn: async () => {
-      const params = new URLSearchParams();
-      params.set("ativo", "true");
-      const tipoNormalizado = pontosTipoEfetivo.trim().toLowerCase();
-      if (tipoNormalizado) params.set("tipo", tipoNormalizado);
-      try {
-        const data = await apiFetch<PontoInstitucionalMapItem[]>(
-          "GET",
-          `/api/pontos-institucionais?${params.toString()}`,
-        );
-        return (Array.isArray(data) ? data : [])
-          .sort((left, right) => left.ordemExibicao - right.ordemExibicao);
-      } catch {
-        return [] as PontoInstitucionalMapItem[];
-      }
-    },
+    empresas,
+    loading,
+    error,
+    heatmapPoints,
+    heatmapLoading,
+    pontosInstitucionais,
+  } = useEmpresasMapData({
+    effectiveFilters,
+    pontosTipoEfetivo,
+    heatmapEnabled: layerToggles.heatmap,
   });
 
   useEffect(() => {
@@ -272,25 +203,17 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     }
   }, [pontoFilters, pontosInstitucionais, pontosBuscaAtiva, selectedPontoInstitucionalId]);
 
-  useEffect(() => {
-    if (!mapTargetPoint) {
-      return;
-    }
-
-    if (lastMapTargetRequestRef.current === mapTargetPoint.requestId) {
-      return;
-    }
-
-    lastMapTargetRequestRef.current = mapTargetPoint.requestId;
-    setPontoFilters(INITIAL_PONTO_FILTERS);
-    setPontosBuscaAtiva(true);
-    setLayerToggles((prev) => ({ ...prev, pontosInstitucionais: true }));
-    setSelectedEmpresaId(null);
-    setSelectedPontoInstitucionalId(mapTargetPoint.id);
-    setReportCollapsed(false);
-    setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
-    setMapFocusTarget([mapTargetPoint.latitude, mapTargetPoint.longitude]);
-  }, [mapTargetPoint, setPontoFilters, setPontosBuscaAtiva]);
+  useMapDeepLink({
+    mapTargetPoint,
+    setPontoFilters,
+    setPontosBuscaAtiva,
+    setLayerToggles,
+    setSelectedEmpresaId,
+    setSelectedPontoInstitucionalId,
+    setReportCollapsed,
+    setPanelsVisible,
+    setMapFocusTarget,
+  });
 
   const {
     data: vizinhanca = null,
@@ -310,30 +233,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     selectedEmpresaId && vizinhancaQueryError instanceof Error
       ? vizinhancaQueryError.message
       : null;
-
-  useEffect(() => {
-    function handleFullscreenChange() {
-      setIsMapFullscreen(document.fullscreenElement === mapStageRef.current);
-    }
-
-    document.addEventListener("fullscreenchange", handleFullscreenChange);
-    return () => document.removeEventListener("fullscreenchange", handleFullscreenChange);
-  }, []);
-
-  async function handleToggleFullscreen() {
-    try {
-      if (document.fullscreenElement === mapStageRef.current) {
-        await document.exitFullscreen();
-        return;
-      }
-
-      if (mapStageRef.current?.requestFullscreen) {
-        await mapStageRef.current.requestFullscreen();
-      }
-    } catch {
-      setIsMapFullscreen((prev) => !prev);
-    }
-  }
 
   function handleClear() {
     handleClearFiltros();
