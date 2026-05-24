@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { apiFetch } from "../../shared/api/apiClient";
+import { STATUS, statusBadgeClass, statusLabel, type StatusEmpresa } from "./empresaStatus";
 
 const EMPRESAS_QUERY_KEY = "empresas";
-import { apiFetch } from "../../shared/api/apiClient";
 
 type EmpresaListItem = {
   id: string;
@@ -19,31 +20,6 @@ type EmpresaListItem = {
   longitude: number;
   status: StatusEmpresa;
 };
-
-// Reflete StatusEmpresa do backend (int enum). Painel mantem como numero
-// pra evitar serializacao customizada no .NET.
-export const STATUS = {
-  Ativo: 1,
-  Inativo: 2,
-  AguardandoRevisao: 3,
-} as const;
-export type StatusEmpresa = 1 | 2 | 3;
-
-export function statusLabel(status: StatusEmpresa) {
-  switch (status) {
-    case STATUS.Ativo: return "Ativa";
-    case STATUS.Inativo: return "Inativa";
-    case STATUS.AguardandoRevisao: return "Aguardando revisão";
-  }
-}
-
-export function statusBadgeClass(status: StatusEmpresa) {
-  switch (status) {
-    case STATUS.Ativo: return "tipo-badge ativa";
-    case STATUS.Inativo: return "tipo-badge inativa";
-    case STATUS.AguardandoRevisao: return "tipo-badge aguardando";
-  }
-}
 
 type EmpresaCreatePayload = {
   cnpj: string;
