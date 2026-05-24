@@ -8,7 +8,7 @@ import {
   getPontoInstitucionalTipoLabel,
   type PontoInstitucionalMapItem,
 } from "../../pontosInstitucionais/markerHelpers";
-import { useMapContext } from "../MapContext";
+import { useMapContext } from "../useMapContext";
 import type { EmpresaVizinha, ReportSectionKey } from "../types";
 
 // Painel direito de "Relatório de Vizinhança" - mostra info da empresa selecionada

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { apiFetch, staticUrl } from "../../shared/api/apiClient";
+import { apiFetch } from "../../shared/api/apiClient";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl } from "react-leaflet";
 import MarkerClusterGroup from "react-leaflet-markercluster";
@@ -10,8 +10,7 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { createEmpresaMarkerIcon } from "./EmpresaMarker";
 import { useDraggable } from "../../shared/hooks/useDraggable";
-import { useAuth } from "../../shared/auth/AuthContext";
-import { MapContextProvider, type MapContextValue } from "./MapContext";
+import { MapContext, type MapContextValue } from "./MapContext";
 import { FilterPanel } from "./components/FilterPanel";
 import { NeighborhoodReportPanel } from "./components/NeighborhoodReportPanel";
 import { MapLegend } from "./components/MapLegend";
@@ -27,9 +26,6 @@ import {
 } from "./MapHelpers";
 import {
   createPontoInstitucionalMarkerIcon,
-  getPontoInstitucionalTipoBadgeClass,
-  getPontoInstitucionalTipoIcon,
-  getPontoInstitucionalTipoIconClass,
   getPontoInstitucionalTipoLabel,
   normalizeTipoPonto,
   type PontoInstitucionalMapItem,
@@ -60,41 +56,8 @@ type EmpresasFilterMapExampleProps = {
 // Acima desse N de markers visiveis, agrupa em clusters automaticamente.
 const CLUSTER_THRESHOLD = 200;
 
-const SETOR_OPTIONS = [
-  { value: "", label: "Todos" },
-  { value: "industria", label: "Indústria" },
-  { value: "comercio", label: "Comércio" },
-  { value: "servicos", label: "Serviços" },
-];
-
-const PORTE_OPTIONS = [
-  { value: "", label: "Todos" },
-  { value: "MEI", label: "MEI" },
-  { value: "ME", label: "ME" },
-  { value: "EPP", label: "EPP" },
-  { value: "LTDA", label: "LTDA" },
-  { value: "SA", label: "S/A" },
-];
-
-const SITUACAO_OPTIONS = [
-  { value: "", label: "Todas" },
-  { value: "ativa", label: "Ativa" },
-  { value: "inativa", label: "Inativa" },
-  { value: "suspensa", label: "Suspensa" },
-  { value: "baixada", label: "Baixada" },
-];
-
-const PONTO_INSTITUCIONAL_TIPO_OPTIONS = [
-  { value: "", label: "Todos" },
-  { value: "educacao", label: "Educação" },
-  { value: "comercio", label: "Comércio" },
-  { value: "financeiro", label: "Financeiro" },
-  { value: "servico", label: "Serviço" },
-  { value: "setorprefeitura", label: "Setor Prefeitura" },
-  { value: "pontoturistico", label: "Ponto Turístico" },
-  { value: "hotel", label: "Hotel / Hospedagem" },
-  { value: "ecoturismo", label: "Ecoturismo" },
-];
+// Opcoes de filtro (SETOR/PORTE/SITUACAO/TIPO de ponto) moveram pra
+// components/FilterPanel.tsx - sao usadas apenas la.
 
 // DEFAULT_CENTER, DEFAULT_ZOOM, MAP_BOUNDS movidos pra ./MapHelpers.tsx - re-importados acima.
 
@@ -201,7 +164,6 @@ function matchesPontoInstitucionalFilters(
 }
 
 export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }: EmpresasFilterMapExampleProps) {
-  const { isAuthenticated } = useAuth();
   const [filters, setFilters] = useState<FilterFormState>(INITIAL_FILTERS);
   const [pontoFilters, setPontoFilters] = useState<PontoInstitucionalFilterState>(INITIAL_PONTO_FILTERS);
   const [cnaeOptions, setCnaeOptions] = useState<CnaeOption[]>([{ value: "", label: "Todos" }]);
@@ -571,7 +533,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   }, [empresasProximas]);
 
   const possuiSelecaoNoMapa = Boolean(selectedEmpresaId || selectedPontoInstitucionalId);
-  const exibirBlocosVizinhanca = !selectedPontoInstitucionalId;
 
   useEffect(() => {
     if (!routeEnabled) {
@@ -797,7 +758,7 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   );
 
   return (
-    <MapContextProvider value={mapContextValue}>
+    <MapContext.Provider value={mapContextValue}>
     <section className="map-dashboard-layout">
       <section className="map-main-panel">
         <div className={isMapFullscreen ? "map-stage is-fullscreen" : "map-stage"} ref={mapStageRef}>
@@ -1000,6 +961,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
       </section>
 
     </section>
-    </MapContextProvider>
+    </MapContext.Provider>
   );
 }

@@ -1,4 +1,4 @@
-import { useMapContext } from "../MapContext";
+import { useMapContext } from "../useMapContext";
 import type { LayerToggleState } from "../types";
 
 // Barra de toggles na borda do mapa: heatmap, marcadores, raio, rotulos,

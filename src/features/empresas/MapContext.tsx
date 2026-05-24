@@ -1,4 +1,4 @@
-import { createContext, useContext } from "react";
+import { createContext } from "react";
 import type {
   CnaeOption,
   EmpresaFilterMapItem,
@@ -90,15 +90,10 @@ export type MapContextValue = {
   onAdminEditEmpresa?: (empresaId: string) => void;
 };
 
-const MapContext = createContext<MapContextValue | null>(null);
-
-export const MapContextProvider = MapContext.Provider;
-
-// Hook customizado: assert nao-null + erro claro caso o consumer esteja fora do Provider.
-export function useMapContext(): MapContextValue {
-  const ctx = useContext(MapContext);
-  if (ctx === null) {
-    throw new Error("useMapContext deve ser chamado dentro de <MapContextProvider>.");
-  }
-  return ctx;
-}
+// Arquivo "puro" (so type + Context object), exigido pelo
+// react-refresh/only-export-components: nao exporta componentes nem hooks,
+// entao Fast Refresh nao se interessa.
+//   - useMapContext() mora em ./useMapContext.ts
+//   - Consumers usam <MapContext.Provider value={...}> diretamente
+//     (o EmpresasFilterMapExample importa MapContext daqui)
+export const MapContext = createContext<MapContextValue | null>(null);

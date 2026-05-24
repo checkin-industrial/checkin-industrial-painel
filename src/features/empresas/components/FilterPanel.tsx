@@ -1,5 +1,5 @@
 import type { useDraggable } from "../../../shared/hooks/useDraggable";
-import { useMapContext } from "../MapContext";
+import { useMapContext } from "../useMapContext";
 import type { FilterFormState, PontoInstitucionalFilterState } from "../types";
 
 // Opcoes estaticas do painel - manter aqui (encapsulado na sub-feature do filtro)
