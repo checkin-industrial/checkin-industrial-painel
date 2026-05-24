@@ -1,6 +1,7 @@
 import type { useDraggable } from "../../../shared/hooks/useDraggable";
 import { useMapContext } from "../useMapContext";
 import type { FilterFormState, PontoInstitucionalFilterState } from "../types";
+import styles from "./FilterPanel.module.css";
 
 // Opcoes estaticas do painel - manter aqui (encapsulado na sub-feature do filtro)
 // evita o container principal ter mais constantes que nao precisa enxergar.
@@ -90,10 +91,12 @@ export function FilterPanel({
     return null;
   }
 
-  const baseClass = "filters-panel map-side-panel map-side-panel--filters draggable-panel";
+  // styles[*] = classes locais ao module; "map-side-panel*"/"draggable-panel"/"dragging"
+  // ficam globais (compartilhadas com NeighborhoodReportPanel + outras).
+  const baseClass = `${styles["filters-panel"]} map-side-panel map-side-panel--filters draggable-panel`;
   const formClassName = [
     baseClass,
-    filtersCollapsed ? "collapsed" : null,
+    filtersCollapsed ? styles.collapsed : null,
     draggable.isDragging ? "dragging" : null,
   ]
     .filter(Boolean)
@@ -128,7 +131,7 @@ export function FilterPanel({
           <>
             <input
               type="search"
-              className="filters-panel__search"
+              className={styles["filters-panel__search"]}
               value={filters.nomeFantasia}
               onChange={(event) => onFilterChange("nomeFantasia", event.target.value)}
               placeholder="Buscar empresa por nome fantasia"
@@ -136,16 +139,16 @@ export function FilterPanel({
               disabled={!empresaBuscaAtiva}
             />
 
-            <div className="filters-panel__content">
+            <div className={styles["filters-panel__content"]}>
               {(!empresaFiltersVisible || !pontosFiltersVisible) && (
-                <div className="filters-panel__restore-row">
+                <div className={styles["filters-panel__restore-row"]}>
                   {!empresaFiltersVisible && (
-                    <button type="button" className="restore-box-btn" onClick={() => setEmpresaFiltersVisible(true)}>
+                    <button type="button" className={styles["restore-box-btn"]} onClick={() => setEmpresaFiltersVisible(true)}>
                       Mostrar Empresas
                     </button>
                   )}
                   {!pontosFiltersVisible && (
-                    <button type="button" className="restore-box-btn" onClick={() => setPontosFiltersVisible(true)}>
+                    <button type="button" className={styles["restore-box-btn"]} onClick={() => setPontosFiltersVisible(true)}>
                       Mostrar Pontos Turísticos
                     </button>
                   )}
@@ -153,10 +156,10 @@ export function FilterPanel({
               )}
 
               {empresaFiltersVisible && (
-                <section className={empresaFiltersCollapsed ? "filters-box collapsed" : "filters-box"}>
-                  <header className="filters-box__header">
+                <section className={empresaFiltersCollapsed ? `${styles["filters-box"]} ${styles.collapsed}` : styles["filters-box"]}>
+                  <header className={styles["filters-box__header"]}>
                     <h3>Empresas</h3>
-                    <div className="filters-box__actions">
+                    <div className={styles["filters-box__actions"]}>
                       <button
                         type="button"
                         className="panel-icon-btn"
@@ -261,8 +264,8 @@ export function FilterPanel({
                     </>
                   )}
 
-                  <footer className="filters-box__footer">
-                    <button type="button" className="filters-search-toggle" onClick={onToggleEmpresaBusca}>
+                  <footer className={styles["filters-box__footer"]}>
+                    <button type="button" className={styles["filters-search-toggle"]} onClick={onToggleEmpresaBusca}>
                       {empresaBuscaAtiva ? "Desativar busca" : "Ativar busca"}
                     </button>
                   </footer>
@@ -270,10 +273,10 @@ export function FilterPanel({
               )}
 
               {pontosFiltersVisible && (
-                <section className={pontosFiltersCollapsed ? "filters-box collapsed" : "filters-box"}>
-                  <header className="filters-box__header">
+                <section className={pontosFiltersCollapsed ? `${styles["filters-box"]} ${styles.collapsed}` : styles["filters-box"]}>
+                  <header className={styles["filters-box__header"]}>
                     <h3>Pontos Institucionais</h3>
-                    <div className="filters-box__actions">
+                    <div className={styles["filters-box__actions"]}>
                       <button
                         type="button"
                         className="panel-icon-btn"
@@ -328,15 +331,15 @@ export function FilterPanel({
                     </>
                   )}
 
-                  <footer className="filters-box__footer">
-                    <button type="button" className="filters-search-toggle" onClick={onTogglePontosBusca}>
+                  <footer className={styles["filters-box__footer"]}>
+                    <button type="button" className={styles["filters-search-toggle"]} onClick={onTogglePontosBusca}>
                       {pontosBuscaAtiva ? "Desativar busca" : "Ativar busca"}
                     </button>
                   </footer>
                 </section>
               )}
 
-              <div className="filters-actions">
+              <div className={styles["filters-actions"]}>
                 <button type="button" onClick={onClear} disabled={loading}>
                   Limpar
                 </button>

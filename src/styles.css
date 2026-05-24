@@ -727,16 +727,9 @@ button {
   color: #64748b;
 }
 
-.filters-panel {
-  border: 1px solid #d0dae8;
-  border-radius: 18px;
-  background: #ffffff;
-  display: flex;
-  flex-direction: column;
-  box-shadow: 0 18px 30px rgba(15, 23, 42, 0.17);
-  max-height: 100%;
-  overflow-y: auto;
-}
+/* .filters-panel + .filters-box* + .filters-actions + .filters-search-toggle
+   + .filters-panel__* + .restore-box-btn movidos para
+   src/features/empresas/components/FilterPanel.module.css */
 
 .map-side-panel {
   backdrop-filter: blur(6px);
@@ -751,14 +744,10 @@ button {
   border-top: 4px solid #0d9488;
 }
 
-.filters-panel.collapsed,
+/* .report-panel.collapsed (gap 0) — .filters-panel equivalente esta no
+   module agora. Aqui sobra so a versao do ReportPanel. */
 .report-panel.collapsed {
   gap: 0;
-}
-
-.filters-panel.collapsed .filters-panel__content,
-.filters-panel.collapsed .filters-panel__search {
-  display: none;
 }
 
 .panel-toggle-header {
@@ -812,179 +801,6 @@ button {
 .panel-icon-btn--inverse.panel-icon-btn--danger {
   border-color: #93c5fd;
   color: #ecf3ff;
-}
-
-.filters-panel .panel-toggle-header {
-  padding: 12px 14px 10px;
-  border-bottom: 1px solid #e7eef8;
-  user-select: none;
-  touch-action: none;
-}
-
-.collapse-toggle {
-  border: 1px solid #7ba1d0;
-  background: #ffffff;
-  color: #1e3a5f;
-  border-radius: 999px;
-  padding: 4px 10px;
-  font-size: 0.76rem;
-  cursor: pointer;
-}
-
-.collapse-toggle.inverse {
-  border-color: #7fb3ff;
-  background: #265ea2;
-  color: #ecf3ff;
-}
-
-.filters-panel h2 {
-  margin: 0;
-  font-size: 1.05rem;
-  color: #0f2847;
-}
-
-.filters-panel__search {
-  margin: 10px 14px;
-  width: calc(100% - 28px);
-  border: 1px solid #d3ddea;
-  border-radius: 999px;
-  padding: 10px 14px;
-  background: #f8fbff;
-  box-sizing: border-box;
-}
-
-.filters-panel__content {
-  padding: 0 14px 12px;
-    flex-grow: 1;
-  display: grid;
-  gap: 10px;
-}
-
-.filters-panel__restore-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.restore-box-btn {
-  border: 1px solid #7ba1d0;
-  background: #ffffff;
-  color: #1e3a5f;
-  border-radius: 999px;
-  padding: 6px 10px;
-  font-size: 0.78rem;
-  cursor: pointer;
-}
-
-.filters-box {
-  border: 1px solid #e6edf7;
-  border-radius: 12px;
-  background: #fbfdff;
-  display: grid;
-  gap: 10px;
-  padding: 12px;
-}
-
-.filters-box.collapsed {
-  gap: 0;
-}
-
-.filters-box__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.filters-box__header h3 {
-  margin: 0;
-  font-size: 0.82rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #47648a;
-}
-
-.filters-box__actions {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.filters-box__footer {
-  border-top: 1px solid #e2e8f0;
-  padding-top: 8px;
-}
-
-.filters-search-toggle {
-  border: 1px solid #1657aa;
-  background: linear-gradient(180deg, #2a73cf 0%, #1657aa 100%);
-  color: #ffffff;
-  border-radius: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-  width: 100%;
-}
-
-.filters-subsection {
-  padding-top: 6px;
-  border-top: 1px solid #d7e4f5;
-}
-
-.filters-subsection h3 {
-  margin: 0;
-  font-size: 0.86rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: #335277;
-}
-
-.filters-panel label {
-  display: grid;
-  gap: 4px;
-  font-size: 0.92rem;
-  color: #0f172a;
-}
-
-.filters-panel input,
-.filters-panel select {
-  width: 100%;
-  border: 1px solid #d3ddea;
-  border-radius: 10px;
-  padding: 9px 11px;
-  background: #ffffff;
-  box-sizing: border-box;
-}
-
-.filters-actions {
-  display: flex;
-  gap: 8px;
-}
-
-.filters-actions button {
-  border: 1px solid #1657aa;
-  background: linear-gradient(180deg, #2a73cf 0%, #1657aa 100%);
-  color: #ffffff;
-  border-radius: 8px;
-  padding: 8px 10px;
-  cursor: pointer;
-}
-
-.filters-actions button[type="button"] {
-  border-color: #94a3b8;
-  background: #ffffff;
-  color: #0f172a;
-}
-
-.filters-actions button:disabled {
-  opacity: 0.65;
-  cursor: not-allowed;
-}
-
-.query-preview {
-  margin: 2px 0;
-  font-size: 0.82rem;
-  color: #475569;
-  word-break: break-all;
 }
 
 .report-panel {
