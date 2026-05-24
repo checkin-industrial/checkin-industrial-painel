@@ -6,7 +6,6 @@ import { PontoInstitucionalListToolbar } from "./components/PontoInstitucionalLi
 import { PontoInstitucionalTable } from "./components/PontoInstitucionalTable";
 import {
   INITIAL_FORM_PONTO,
-  parsePontoTipoValue,
   type PontoInstitucionalListItem,
   type PontoInstitucionalPayload,
   type StatusFiltroPonto,
@@ -150,7 +149,7 @@ export function PontosInstitucionaisManagementScreen() {
       setEditingId(id);
       const nextFormData: PontoInstitucionalPayload = {
         nome: data.nome ?? "",
-        tipo: parsePontoTipoValue(data.tipo),
+        tipo: data.tipo ?? "educacao",
         descricao: data.descricao ?? "",
         endereco: data.endereco ?? "",
         latitude: Number(data.latitude),
@@ -387,7 +386,7 @@ export function PontosInstitucionaisManagementScreen() {
 
     const payload: PontoInstitucionalPayload = {
       nome: item.nome,
-      tipo: parsePontoTipoValue(item.tipo),
+      tipo: item.tipo,
       descricao: item.descricao,
       endereco: item.endereco,
       latitude: Number(item.latitude),
