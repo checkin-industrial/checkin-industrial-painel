@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { EmpresasFilterMapExample } from "./features/empresas/EmpresasFilterMapExample";
 import { EmpresasManagementScreen } from "./features/empresas/EmpresasManagementScreen";
+import { GoogleMapsImportScreen } from "./features/empresas/GoogleMapsImportScreen";
 import { PontosInstitucionaisManagementScreen } from "./features/pontosInstitucionais/PontosInstitucionaisManagementScreen";
 import { PontosInstitucionaisCardsScreen } from "./features/pontosInstitucionais/PontosInstitucionaisCardsScreen";
 import { TelefonesUteisCardsScreen } from "./features/telefonesUteis/TelefonesUteisCardsScreen";
@@ -9,9 +10,9 @@ import { useAuth } from "./shared/auth/AuthContext";
 import { LoginModal } from "./shared/auth/LoginModal";
 import logo from "./imagens/logo.png";
 
-type DashboardTab = "mapa" | "gestao" | "gestao-pontos" | "cards-pontos" | "cards-telefones" | "gestao-telefones";
+type DashboardTab = "mapa" | "gestao" | "gestao-pontos" | "cards-pontos" | "cards-telefones" | "gestao-telefones" | "import-google-maps";
 
-const ADMIN_TABS: DashboardTab[] = ["gestao", "gestao-pontos", "gestao-telefones"];
+const ADMIN_TABS: DashboardTab[] = ["gestao", "gestao-pontos", "gestao-telefones", "import-google-maps"];
 
 function isAdminTab(tab: DashboardTab): boolean {
   return ADMIN_TABS.includes(tab);
@@ -187,6 +188,14 @@ export function App() {
                 >
                   Gestão Telefones Úteis
                 </button>
+                <button
+                  type="button"
+                  className={activeTab === "import-google-maps" ? "top-submenu-link active" : "top-submenu-link"}
+                  role="menuitem"
+                  onClick={() => handleNavigate("import-google-maps")}
+                >
+                  Importar do Google Maps
+                </button>
                 {isAuthenticated && (
                   <button
                     type="button"
@@ -211,6 +220,7 @@ export function App() {
         {activeTab === "cards-pontos" && <PontosInstitucionaisCardsScreen onRouteToPoint={handleRouteToPointFromCards} />}
         {activeTab === "cards-telefones" && <TelefonesUteisCardsScreen />}
         {activeTab === "gestao-telefones" && <TelefonesUteisManagementScreen />}
+        {activeTab === "import-google-maps" && <GoogleMapsImportScreen onGoToManagement={() => setActiveTab("gestao")} />}
       </main>
 
       <LoginModal
