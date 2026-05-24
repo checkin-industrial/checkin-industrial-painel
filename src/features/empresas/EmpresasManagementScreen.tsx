@@ -1,128 +1,19 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
-import { STATUS, statusBadgeClass, statusLabel, type StatusEmpresa } from "./empresaStatus";
+import { STATUS, type StatusEmpresa } from "./empresaStatus";
+import type {
+  EmpresaCreatePayload,
+  EmpresaDetalheResponseRaw,
+  EmpresaListItem,
+  GeocodeResponse,
+  StatusFiltro,
+} from "./types";
+import { EmpresasListToolbar } from "./components/EmpresasListToolbar";
+import { EmpresasTable } from "./components/EmpresasTable";
+import { EmpresaFormModal, INITIAL_FORM } from "./components/EmpresaFormModal";
 
 const EMPRESAS_QUERY_KEY = "empresas";
-
-type EmpresaListItem = {
-  id: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  descricaoCnae: string;
-  setor: string;
-  porte: string;
-  telefone: string;
-  cep: string;
-  municipio: string;
-  matrizOuFilial: string;
-  latitude: number;
-  longitude: number;
-  status: StatusEmpresa;
-};
-
-type EmpresaCreatePayload = {
-  cnpj: string;
-  razaoSocial: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  setor: number;
-  porte: number;
-  numeroFuncionarios: number;
-  endereco: string;
-  telefone: string;
-  cep: string;
-  municipio: string;
-  descricaoCnae: string;
-  matrizOuFilial: number;
-  latitude: number;
-  longitude: number;
-  situacaoCadastral: number;
-  status?: StatusEmpresa;
-};
-
-type EmpresaDetalheResponse = {
-  id: string;
-  cnpj: string;
-  razaoSocial: string;
-  nomeFantasia: string;
-  cnaePrincipal: string;
-  descricaoCnae: string;
-  setor: number;
-  porte: number;
-  numeroFuncionarios: number;
-  endereco: string;
-  Endereco?: string;
-  telefone: string;
-  cep: string;
-  municipio: string;
-  matrizOuFilialCodigo?: number;
-  latitude: number;
-  longitude: number;
-  situacaoCadastral: number;
-  status?: StatusEmpresa;
-};
-
-type EmpresaDetalheResponseRaw = EmpresaDetalheResponse & {
-  endereco?: string;
-  Endereco?: string;
-  logradouro?: string;
-  Logradouro?: string;
-  address?: string;
-  Address?: string;
-};
-
-type GeocodeResponse = {
-  latitude: number;
-  longitude: number;
-  accuracy?: string;
-  provider?: string;
-};
-
-const SETOR_OPTIONS = [
-  { value: 1, label: "Industria" },
-  { value: 2, label: "Comercio" },
-  { value: 3, label: "Servicos" },
-];
-
-const PORTE_OPTIONS = [
-  { value: 1, label: "MEI" },
-  { value: 2, label: "ME" },
-  { value: 3, label: "EPP" },
-  { value: 4, label: "LTDA" },
-  { value: 5, label: "S/A" },
-];
-
-const MATRIZ_FILIAL_OPTIONS = [
-  { value: 1, label: "Matriz" },
-  { value: 2, label: "Filial" },
-];
-
-const SITUACAO_OPTIONS = [
-  { value: 1, label: "Ativa" },
-  { value: 2, label: "Inativa" },
-  { value: 3, label: "Suspensa" },
-  { value: 4, label: "Baixada" },
-];
-
-const INITIAL_FORM: EmpresaCreatePayload = {
-  cnpj: "",
-  razaoSocial: "",
-  nomeFantasia: "",
-  cnaePrincipal: "",
-  setor: 1,
-  porte: 2,
-  numeroFuncionarios: 0,
-  endereco: "",
-  telefone: "",
-  cep: "",
-  municipio: "",
-  descricaoCnae: "",
-  matrizOuFilial: 1,
-  latitude: -22.6,
-  longitude: -48.8,
-  situacaoCadastral: 1,
-};
 
 function sanitizeDigits(value: string) {
   return value.replace(/\D/g, "");
@@ -140,7 +31,7 @@ type EmpresasManagementScreenProps = {
 export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: EmpresasManagementScreenProps = {}) {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFiltro, setStatusFiltro] = useState<"ativo" | "inativo" | "aguardando-revisao" | "todos">("ativo");
+  const [statusFiltro, setStatusFiltro] = useState<StatusFiltro>("ativo");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -458,343 +349,39 @@ export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: Empr
           <span className="panel-hint">Total exibido: {filteredEmpresas.length}</span>
         </div>
 
-        <div className="company-list-toolbar">
-          <input
-            type="search"
-            value={searchTerm}
-            onChange={(event) => setSearchTerm(event.target.value)}
-            placeholder="Buscar por nome, CNAE, município, telefone ou CEP"
-          />
-          <select
-            value={statusFiltro}
-            onChange={(event) => setStatusFiltro(event.target.value as typeof statusFiltro)}
-            aria-label="Filtro de status"
-          >
-            <option value="ativo">Somente ativas</option>
-            <option value="inativo">Somente inativas</option>
-            <option value="aguardando-revisao">Aguardando revisão</option>
-            <option value="todos">Todas</option>
-          </select>
-          <button type="button" className="btn-with-icon btn-action-new" onClick={handleOpenCreateModal}>
-            Nova Empresa
-          </button>
-          <button type="button" className="ghost btn-with-icon btn-action-refresh" onClick={() => refetchEmpresas()} disabled={loadingList}>
-            {loadingList ? "Atualizando..." : "Atualizar"}
-          </button>
-        </div>
+        <EmpresasListToolbar
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          statusFiltro={statusFiltro}
+          onStatusFiltroChange={setStatusFiltro}
+          onOpenCreateModal={handleOpenCreateModal}
+          onRefresh={() => refetchEmpresas()}
+          loadingList={loadingList}
+        />
 
         {(error || queryErrorMessage) && <p className="status-error">{error || queryErrorMessage}</p>}
         {successMessage && <p className="status-info">{successMessage}</p>}
 
-        <div className="table-wrapper">
-          <table className="company-table">
-            <thead>
-              <tr>
-                <th>Nome Fantasia</th>
-                <th>Setor</th>
-                <th>Porte</th>
-                <th>CNAE</th>
-                <th>Município</th>
-                <th>Contato</th>
-                <th>Status</th>
-                <th>Ações</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredEmpresas.map((empresa) => (
-                <tr key={empresa.id}>
-                  <td data-label="Nome Fantasia">
-                    <strong>{empresa.nomeFantasia}</strong>
-                    <small>{empresa.matrizOuFilial}</small>
-                  </td>
-                  <td data-label="Setor">{empresa.setor}</td>
-                  <td data-label="Porte">{empresa.porte}</td>
-                  <td data-label="CNAE">
-                    <span>{empresa.cnaePrincipal}</span>
-                    <small>{empresa.descricaoCnae}</small>
-                  </td>
-                  <td data-label="Município">{empresa.municipio}</td>
-                  <td data-label="Contato">
-                    <span>{empresa.telefone || "-"}</span>
-                    <small>CEP: {empresa.cep || "-"}</small>
-                  </td>
-                  <td data-label="Status">
-                    <span className={statusBadgeClass(empresa.status)}>{statusLabel(empresa.status)}</span>
-                  </td>
-                  <td data-label="Ações">
-                    <div className="action-group">
-                      <button type="button" className="warning btn-with-icon btn-action-edit" onClick={() => handleEdit(empresa.id)}>
-                        Editar
-                      </button>
-                      {empresa.status === STATUS.Ativo && (
-                        <button type="button" className="danger btn-with-icon btn-action-delete" onClick={() => handleDelete(empresa.id)}>
-                          Excluir
-                        </button>
-                      )}
-                      {empresa.status === STATUS.Inativo && (
-                        <button type="button" className="ghost btn-with-icon btn-action-reactivate" onClick={() => handleReactivate(empresa)}>
-                          Reativar
-                        </button>
-                      )}
-                      {empresa.status === STATUS.AguardandoRevisao && (
-                        <>
-                          <button type="button" className="ghost btn-with-icon btn-action-reactivate" onClick={() => handleReactivate(empresa)}>
-                            Aprovar
-                          </button>
-                          <button type="button" className="danger btn-with-icon btn-action-delete" onClick={() => handleDelete(empresa.id)}>
-                            Rejeitar
-                          </button>
-                        </>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-
-              {loadingList && filteredEmpresas.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="table-loading-cell">
-                    <div className="map-loading-spinner" />
-                    <div className="map-loading-label">Carregando empresas...</div>
-                  </td>
-                </tr>
-              )}
-
-              {!loadingList && filteredEmpresas.length === 0 && (
-                <tr>
-                  <td colSpan={8} className="empty-state">Nenhuma empresa encontrada para o filtro informado.</td>
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
+        <EmpresasTable
+          empresas={filteredEmpresas}
+          loadingList={loadingList}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          onReactivate={handleReactivate}
+        />
       </section>
 
-      {isModalOpen && (
-        <div className="app-modal-backdrop" role="dialog" aria-modal="true" onClick={handleRequestCloseModal}>
-          <div className="app-modal-card app-modal-card--wide" onClick={(event) => event.stopPropagation()}>
-            <div className="app-modal-header">
-              <h2>{editingId ? "Editar Empresa" : "Nova Empresa"}</h2>
-              <button type="button" className="app-modal-close btn-with-icon btn-action-close" onClick={handleRequestCloseModal}>Fechar</button>
-            </div>
-
-            <form className="company-form" onSubmit={handleSubmit}>
-              <div className="form-grid">
-                <label>
-                  CNPJ
-                  <input
-                    type="text"
-                    value={formData.cnpj}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, cnpj: event.target.value }))}
-                    maxLength={18}
-                    placeholder="Somente números"
-                    required
-                  />
-                </label>
-
-                <label>
-                  Razão Social
-                  <input
-                    type="text"
-                    value={formData.razaoSocial}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, razaoSocial: event.target.value }))}
-                    maxLength={200}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Nome Fantasia
-                  <input
-                    type="text"
-                    value={formData.nomeFantasia}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, nomeFantasia: event.target.value }))}
-                    maxLength={200}
-                    required
-                  />
-                </label>
-
-                <label>
-                  CNAE Principal
-                  <input
-                    type="text"
-                    value={formData.cnaePrincipal}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, cnaePrincipal: event.target.value }))}
-                    maxLength={12}
-                    placeholder="7 dígitos"
-                    required
-                  />
-                </label>
-
-                <label>
-                  Setor
-                  <select
-                    value={formData.setor}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, setor: Number(event.target.value) }))}
-                  >
-                    {SETOR_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Porte
-                  <select
-                    value={formData.porte}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, porte: Number(event.target.value) }))}
-                  >
-                    {PORTE_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Funcionários
-                  <input
-                    type="number"
-                    min={0}
-                    value={formData.numeroFuncionarios}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, numeroFuncionarios: Number(event.target.value) }))}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Telefone
-                  <input
-                    type="text"
-                    value={formData.telefone}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, telefone: event.target.value }))}
-                    required
-                  />
-                </label>
-
-                <label>
-                  CEP
-                  <input
-                    type="text"
-                    value={formData.cep}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, cep: event.target.value }))}
-                    maxLength={9}
-                    placeholder="8 dígitos"
-                    required
-                  />
-                </label>
-
-                <label>
-                  Município
-                  <input
-                    type="text"
-                    value={formData.municipio}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, municipio: event.target.value }))}
-                    maxLength={150}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Matriz/Filial
-                  <select
-                    value={formData.matrizOuFilial}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, matrizOuFilial: Number(event.target.value) }))}
-                  >
-                    {MATRIZ_FILIAL_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Situação
-                  <select
-                    value={formData.situacaoCadastral}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, situacaoCadastral: Number(event.target.value) }))}
-                  >
-                    {SITUACAO_OPTIONS.map((option) => (
-                      <option key={option.value} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label>
-                  Latitude
-                  <input
-                    type="number"
-                    step="0.000001"
-                    min={-90}
-                    max={90}
-                    value={formData.latitude}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, latitude: Number(event.target.value) }))}
-                    required
-                  />
-                </label>
-
-                <label>
-                  Longitude
-                  <input
-                    type="number"
-                    step="0.000001"
-                    min={-180}
-                    max={180}
-                    value={formData.longitude}
-                    onChange={(event) => setFormData((prev) => ({ ...prev, longitude: Number(event.target.value) }))}
-                    required
-                  />
-                </label>
-              </div>
-
-              <label>
-                Endereço
-                <input
-                  type="text"
-                  value={formData.endereco}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, endereco: event.target.value }))}
-                  maxLength={300}
-                  required
-                />
-              </label>
-
-              <label>
-                Descrição CNAE
-                <input
-                  type="text"
-                  value={formData.descricaoCnae}
-                  onChange={(event) => setFormData((prev) => ({ ...prev, descricaoCnae: event.target.value }))}
-                  maxLength={300}
-                  required
-                />
-              </label>
-
-              <div className="company-form-actions">
-                <button
-                  type="button"
-                  className="ghost btn-with-icon btn-action-geocode"
-                  onClick={handleGeocodeFromAddress}
-                  disabled={submitting || geocoding || !formData.endereco.trim()}
-                >
-                  {geocoding ? "Geocodificando..." : "Atualizar Geolocalização"}
-                </button>
-                <button type="submit" className="btn-with-icon btn-action-save" disabled={submitting}>
-                  {submitting ? "Salvando..." : editingId ? "Salvar Alterações" : "Cadastrar Empresa"}
-                </button>
-                <button type="button" className="ghost btn-with-icon btn-action-cancel" onClick={handleRequestCloseModal} disabled={submitting}>
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <EmpresaFormModal
+        isOpen={isModalOpen}
+        editingId={editingId}
+        formData={formData}
+        setFormData={setFormData}
+        submitting={submitting}
+        geocoding={geocoding}
+        onSubmit={handleSubmit}
+        onClose={handleRequestCloseModal}
+        onGeocode={handleGeocodeFromAddress}
+      />
     </section>
   );
 }
