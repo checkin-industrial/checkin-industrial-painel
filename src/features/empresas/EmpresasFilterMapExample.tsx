@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
 import { Circle, MapContainer, TileLayer, ZoomControl } from "react-leaflet";
@@ -8,12 +8,15 @@ import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { useDraggable } from "../../shared/hooks/useDraggable";
 import { MapContext, type MapContextValue } from "./MapContext";
-import { useFiltrosEmpresas, INITIAL_PONTO_FILTERS } from "./hooks/useFiltrosEmpresas";
+import { useFiltrosEmpresas } from "./hooks/useFiltrosEmpresas";
 import { useUserLocation } from "./hooks/useUserLocation";
 import { useRouteOSRM } from "./hooks/useRouteOSRM";
 import { useEmpresasMapData } from "./hooks/useEmpresasMapData";
 import { useMapFullscreen } from "./hooks/useMapFullscreen";
 import { useMapDeepLink } from "./hooks/useMapDeepLink";
+import { useCnaeMunicipioOptions } from "./hooks/useCnaeMunicipioOptions";
+import { useEmpresaMapSelectionEffects } from "./hooks/useEmpresaMapSelectionEffects";
+import { useMapDerivedSelection } from "./hooks/useMapDerivedSelection";
 import { FilterPanel } from "./components/FilterPanel";
 import { NeighborhoodReportPanel } from "./components/NeighborhoodReportPanel";
 import { MapLegend } from "./components/MapLegend";
@@ -21,26 +24,14 @@ import { EmpresasMarkersLayer } from "./components/EmpresasMarkersLayer";
 import { PontosInstitucionaisMarkersLayer } from "./components/PontosInstitucionaisMarkersLayer";
 import { UserLocationLayer } from "./components/UserLocationLayer";
 import { RouteOverlay } from "./components/RouteOverlay";
-import {
-  DEFAULT_CENTER,
-  DEFAULT_ZOOM,
-  HeatmapLayer,
-  isCoordinateInsideViewportWindow,
-  type LatLngTuple,
-  MapFocusTarget,
-  MapViewport,
-} from "./MapHelpers";
-import { matchesPontoInstitucionalFilters } from "../pontosInstitucionais/markerHelpers";
+import { DEFAULT_ZOOM, HeatmapLayer, type LatLngTuple, MapFocusTarget, MapViewport } from "./MapHelpers";
 
 // Types movidos pra ./types.ts (compartilhados com sub-componentes).
 // MapHelpers.tsx mantem LeafletHeatLayer, HeatmapPointTuple, LatLngTuple.
 import type {
-  EmpresaFilterMapItem,
   EmpresaVizinhancaResponse,
   MapTargetPoint,
   ReportSectionKey,
-  FilterFormState,
-  CnaeOption,
   LayerToggleState,
 } from "./types";
 
@@ -65,42 +56,14 @@ const INITIAL_LAYER_TOGGLES: LayerToggleState = {
   pontosInstitucionais: true,
 };
 
-// Helpers de PontoInstitucional (normalizeTipoPonto, getPontoInstitucionalTipoLabel,
-// getPontoInstitucionalTipoBadgeClass, getPontoInstitucionalTipoIcon,
-// getPontoInstitucionalTipoIconClass, getPontoInstitucionalColor,
-// createPontoInstitucionalMarkerIcon) movidos para ../pontosInstitucionais/markerHelpers.ts
-// e re-importados no topo do arquivo.
-
-function hasActiveFilters(filters: FilterFormState) {
-  return Object.values(filters).some((value) => value.trim() !== "");
-}
-
-function buildCnaeOptions(empresas: EmpresaFilterMapItem[]): CnaeOption[] {
-  const uniqueOptions = new Map<string, string>();
-
-  for (const empresa of empresas) {
-    if (!empresa.cnaePrincipal) {
-      continue;
-    }
-
-    const descricao = empresa.descricaoCnae ? ` - ${empresa.descricaoCnae}` : "";
-    uniqueOptions.set(empresa.cnaePrincipal, `${empresa.cnaePrincipal}${descricao}`);
-  }
-
-  return [{ value: "", label: "Todos" }, ...Array.from(uniqueOptions.entries())
-    .sort((left, right) => left[0].localeCompare(right[0]))
-    .map(([value, label]) => ({ value, label }))];
-}
-
-function buildMunicipioOptions(empresas: EmpresaFilterMapItem[]) {
-  const uniqueMunicipios = Array.from(new Set(empresas.map((empresa) => empresa.municipio).filter(Boolean)));
-
-  return uniqueMunicipios.sort((left, right) => left.localeCompare(right));
-}
-
-// isCoordinateInsideViewportWindow, MapViewport, MapFocusTarget, HeatmapLayer
-// movidos para ./MapHelpers.tsx e re-importados no topo do arquivo.
-// buildQueryString agora vive em hooks/useEmpresasMapData.ts (unico consumidor).
+// Helpers de PontoInstitucional (label/badge/icon/iconClass/color/createIcon)
+// vivem em ../pontosInstitucionais/markerHelpers.ts e sao re-usados pelos
+// MarkersLayers.
+// MapHelpers (DEFAULT_CENTER, MapViewport, MapFocusTarget, HeatmapLayer,
+// isCoordinateInsideViewportWindow) sao re-exportados acima.
+// Hooks especializados (vide hooks/) cobrem: filtros, localizacao, rota,
+// queries de dados, fullscreen, deep-link, opcoes de CNAE/municipio,
+// efeitos de selecao + memos derivados.
 
 export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }: EmpresasFilterMapExampleProps) {
   const {
@@ -120,8 +83,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     togglePontosBusca,
     handleClearFiltros,
   } = useFiltrosEmpresas();
-  const [cnaeOptions, setCnaeOptions] = useState<CnaeOption[]>([{ value: "", label: "Todos" }]);
-  const [municipioOptions, setMunicipioOptions] = useState<string[]>([]);
   const [filtersCollapsed, setFiltersCollapsed] = useState(true);
   const [empresaFiltersCollapsed, setEmpresaFiltersCollapsed] = useState(false);
   const [pontosFiltersCollapsed, setPontosFiltersCollapsed] = useState(false);
@@ -164,44 +125,10 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     heatmapEnabled: layerToggles.heatmap,
   });
 
-  useEffect(() => {
-    if (!hasActiveFilters(effectiveFilters) && empresas.length > 0) {
-      setCnaeOptions(buildCnaeOptions(empresas));
-      setMunicipioOptions(buildMunicipioOptions(empresas));
-    }
-  }, [empresas, effectiveFilters]);
-
-  useEffect(() => {
-    if (selectedEmpresaId && !empresas.some((empresa) => empresa.id === selectedEmpresaId)) {
-      setSelectedEmpresaId(null);
-    }
-  }, [empresas, selectedEmpresaId]);
-
-  useEffect(() => {
-    setCollapsedReportSections({
-      proximas: false,
-      cnae: true,
-      setor: true,
-    });
-  }, [selectedEmpresaId]);
-
-  useEffect(() => {
-    if (!selectedPontoInstitucionalId) {
-      return;
-    }
-
-    const pontoSelecionadoAindaVisivel = pontosInstitucionais
-      .filter((ponto) => isCoordinateInsideViewportWindow(ponto.latitude, ponto.longitude))
-      .filter((ponto) => matchesPontoInstitucionalFilters(
-        ponto,
-        pontosBuscaAtiva ? pontoFilters : INITIAL_PONTO_FILTERS,
-      ))
-      .some((ponto) => ponto.id === selectedPontoInstitucionalId);
-
-    if (!pontoSelecionadoAindaVisivel) {
-      setSelectedPontoInstitucionalId(null);
-    }
-  }, [pontoFilters, pontosInstitucionais, pontosBuscaAtiva, selectedPontoInstitucionalId]);
+  const { cnaeOptions, municipioOptions } = useCnaeMunicipioOptions({
+    empresas,
+    effectiveFilters,
+  });
 
   useMapDeepLink({
     mapTargetPoint,
@@ -244,49 +171,37 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     setPontosFiltersCollapsed(false);
   }
 
-  const center = useMemo<[number, number]>(() => {
-    if (empresas.length === 0) {
-      return DEFAULT_CENTER;
-    }
+  const {
+    center,
+    empresaSelecionadaNoMapa,
+    pontoInstitucionalSelecionado,
+    rotaDestino,
+    pontosInstitucionaisFiltrados,
+    analysisCenter,
+    empresasMesmoCnae,
+    empresasMesmoSetor,
+    avgDistanceKm,
+  } = useMapDerivedSelection({
+    empresas,
+    pontosInstitucionais,
+    pontoFilters,
+    pontosBuscaAtiva,
+    selectedEmpresaId,
+    selectedPontoInstitucionalId,
+    vizinhanca,
+  });
 
-    const avgLat = empresas.reduce((acc, item) => acc + item.latitude, 0) / empresas.length;
-    const avgLng = empresas.reduce((acc, item) => acc + item.longitude, 0) / empresas.length;
-    return [avgLat, avgLng];
-  }, [empresas]);
-
-  const empresaSelecionadaNoMapa = useMemo(() => {
-    if (!selectedEmpresaId) {
-      return null;
-    }
-
-    return empresas.find((empresa) => empresa.id === selectedEmpresaId) ?? null;
-  }, [empresas, selectedEmpresaId]);
-
-  const pontoInstitucionalSelecionado = useMemo(() => {
-    if (!selectedPontoInstitucionalId) {
-      return null;
-    }
-
-    return pontosInstitucionais
-      .filter((ponto) => isCoordinateInsideViewportWindow(ponto.latitude, ponto.longitude))
-      .filter((ponto) => matchesPontoInstitucionalFilters(
-        ponto,
-        pontosBuscaAtiva ? pontoFilters : INITIAL_PONTO_FILTERS,
-      ))
-      .find((ponto) => ponto.id === selectedPontoInstitucionalId) ?? null;
-  }, [pontoFilters, pontosInstitucionais, pontosBuscaAtiva, selectedPontoInstitucionalId]);
-
-  const rotaDestino = useMemo<LatLngTuple | null>(() => {
-    if (pontoInstitucionalSelecionado) {
-      return [pontoInstitucionalSelecionado.latitude, pontoInstitucionalSelecionado.longitude];
-    }
-
-    if (empresaSelecionadaNoMapa) {
-      return [empresaSelecionadaNoMapa.latitude, empresaSelecionadaNoMapa.longitude];
-    }
-
-    return null;
-  }, [empresaSelecionadaNoMapa, pontoInstitucionalSelecionado]);
+  useEmpresaMapSelectionEffects({
+    empresas,
+    pontosInstitucionais,
+    pontoFilters,
+    pontosBuscaAtiva,
+    selectedEmpresaId,
+    setSelectedEmpresaId,
+    selectedPontoInstitucionalId,
+    setSelectedPontoInstitucionalId,
+    setCollapsedReportSections,
+  });
 
   const {
     routePath,
@@ -310,53 +225,7 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     }
   }
 
-  const pontosInstitucionaisFiltrados = useMemo(() => {
-    return pontosInstitucionais
-      .filter((ponto) => isCoordinateInsideViewportWindow(ponto.latitude, ponto.longitude))
-      .filter((ponto) => matchesPontoInstitucionalFilters(
-        ponto,
-        pontosBuscaAtiva ? pontoFilters : INITIAL_PONTO_FILTERS,
-      ));
-  }, [pontoFilters, pontosInstitucionais, pontosBuscaAtiva]);
-
-  const analysisCenter = useMemo<[number, number]>(() => {
-    if (vizinhanca?.empresaBase) {
-      return [vizinhanca.empresaBase.latitude, vizinhanca.empresaBase.longitude];
-    }
-
-    if (empresaSelecionadaNoMapa) {
-      return [empresaSelecionadaNoMapa.latitude, empresaSelecionadaNoMapa.longitude];
-    }
-
-    return center;
-  }, [center, empresaSelecionadaNoMapa, vizinhanca]);
-
-  const empresasProximas = useMemo(
-    () => vizinhanca?.empresasProximas ?? [],
-    [vizinhanca?.empresasProximas],
-  );
-
-  const empresasMesmoCnae = useMemo(() => {
-    return empresasProximas.filter((empresa) => empresa.mesmoCnae);
-  }, [empresasProximas]);
-
-  const empresasMesmoSetor = useMemo(() => {
-    return empresasProximas.filter((empresa) => empresa.mesmoSetor);
-  }, [empresasProximas]);
-
   const possuiSelecaoNoMapa = Boolean(selectedEmpresaId || selectedPontoInstitucionalId);
-
-  const avgDistanceKm = useMemo(() => {
-    if (empresasProximas.length === 0) {
-      return 0;
-    }
-
-    const totalDistance = empresasProximas.reduce((acc, empresa) => {
-      return acc + empresa.distanciaMetros / 1000;
-    }, 0);
-
-    return totalDistance / empresasProximas.length;
-  }, [empresasProximas]);
 
   function toggleReportSection(section: ReportSectionKey) {
     setCollapsedReportSections((prev) => ({
