@@ -29,6 +29,47 @@ export function normalizeTipoPonto(tipo: string) {
   return tipo.trim().toLowerCase();
 }
 
+export type PontoInstitucionalFilterShape = {
+  termo: string;
+  tipo: string;
+};
+
+/**
+ * Filtro client-side para Pontos Institucionais (termo + tipo).
+ * Reusado por EmpresasFilterMapExample (mapa publico) e sub-componentes
+ * que precisam materializar a lista filtrada localmente.
+ */
+export function matchesPontoInstitucionalFilters(
+  ponto: PontoInstitucionalMapItem,
+  filters: PontoInstitucionalFilterShape,
+) {
+  const tipo = filters.tipo.trim().toLowerCase();
+  if (tipo && normalizeTipoPonto(ponto.tipo) !== tipo) {
+    return false;
+  }
+
+  const termo = filters.termo.trim().toLowerCase();
+  if (!termo) {
+    return true;
+  }
+
+  const searchableText = [
+    ponto.nome,
+    ponto.descricao,
+    ponto.endereco,
+    ponto.atividadesDisponiveis,
+    ponto.equipeGestao,
+    ponto.contatoNome,
+    ponto.contatoTelefone,
+    ponto.contatoEmail,
+    getPontoInstitucionalTipoLabel(ponto.tipo),
+  ]
+    .join(" ")
+    .toLowerCase();
+
+  return searchableText.includes(termo);
+}
+
 export function getPontoInstitucionalTipoLabel(tipo: string) {
   switch (normalizeTipoPonto(tipo)) {
     case "educacao":

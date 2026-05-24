@@ -1,14 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
-import L from "leaflet";
-import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl } from "react-leaflet";
-import MarkerClusterGroup from "react-leaflet-markercluster";
+import { Circle, MapContainer, TileLayer, ZoomControl } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
-import { createEmpresaMarkerIcon } from "./EmpresaMarker";
 import { useDraggable } from "../../shared/hooks/useDraggable";
 import { MapContext, type MapContextValue } from "./MapContext";
 import { useFiltrosEmpresas, INITIAL_PONTO_FILTERS } from "./hooks/useFiltrosEmpresas";
@@ -17,6 +14,10 @@ import { useRouteOSRM } from "./hooks/useRouteOSRM";
 import { FilterPanel } from "./components/FilterPanel";
 import { NeighborhoodReportPanel } from "./components/NeighborhoodReportPanel";
 import { MapLegend } from "./components/MapLegend";
+import { EmpresasMarkersLayer } from "./components/EmpresasMarkersLayer";
+import { PontosInstitucionaisMarkersLayer } from "./components/PontosInstitucionaisMarkersLayer";
+import { UserLocationLayer } from "./components/UserLocationLayer";
+import { RouteOverlay } from "./components/RouteOverlay";
 import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
@@ -28,9 +29,7 @@ import {
   MapViewport,
 } from "./MapHelpers";
 import {
-  createPontoInstitucionalMarkerIcon,
-  getPontoInstitucionalTipoLabel,
-  normalizeTipoPonto,
+  matchesPontoInstitucionalFilters,
   type PontoInstitucionalMapItem,
 } from "../pontosInstitucionais/markerHelpers";
 
@@ -43,7 +42,6 @@ import type {
   MapTargetPoint,
   ReportSectionKey,
   FilterFormState,
-  PontoInstitucionalFilterState,
   CnaeOption,
   LayerToggleState,
 } from "./types";
@@ -56,12 +54,9 @@ type EmpresasFilterMapExampleProps = {
   onAdminEditEmpresa?: (empresaId: string) => void;
 };
 
-// Acima desse N de markers visiveis, agrupa em clusters automaticamente.
-const CLUSTER_THRESHOLD = 200;
-
 // Opcoes de filtro (SETOR/PORTE/SITUACAO/TIPO de ponto) moveram pra
 // components/FilterPanel.tsx - sao usadas apenas la.
-
+// CLUSTER_THRESHOLD vive em components/EmpresasMarkersLayer.tsx (consumidor unico).
 // DEFAULT_CENTER, DEFAULT_ZOOM, MAP_BOUNDS movidos pra ./MapHelpers.tsx - re-importados acima.
 
 const INITIAL_LAYER_TOGGLES: LayerToggleState = {
@@ -119,37 +114,6 @@ function buildQueryString(filters: FilterFormState) {
   }
 
   return params.toString();
-}
-
-function matchesPontoInstitucionalFilters(
-  ponto: PontoInstitucionalMapItem,
-  filters: PontoInstitucionalFilterState,
-) {
-  const tipo = filters.tipo.trim().toLowerCase();
-  if (tipo && normalizeTipoPonto(ponto.tipo) !== tipo) {
-    return false;
-  }
-
-  const termo = filters.termo.trim().toLowerCase();
-  if (!termo) {
-    return true;
-  }
-
-  const searchableText = [
-    ponto.nome,
-    ponto.descricao,
-    ponto.endereco,
-    ponto.atividadesDisponiveis,
-    ponto.equipeGestao,
-    ponto.contatoNome,
-    ponto.contatoTelefone,
-    ponto.contatoEmail,
-    getPontoInstitucionalTipoLabel(ponto.tipo),
-  ]
-    .join(" ")
-    .toLowerCase();
-
-  return searchableText.includes(termo);
 }
 
 export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }: EmpresasFilterMapExampleProps) {
@@ -678,132 +642,10 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
                 />
               )}
 
-              {layerToggles.marcadores && (() => {
-                const visiveis = empresas.filter((empresa) =>
-                  isCoordinateInsideViewportWindow(empresa.latitude, empresa.longitude),
-                );
-                const markers = visiveis.map((empresa) => (
-                  <Marker
-                    key={empresa.id}
-                    position={[empresa.latitude, empresa.longitude]}
-                    icon={createEmpresaMarkerIcon(
-                      empresa.setor,
-                      empresa.id === selectedEmpresaId,
-                      empresa.nomeFantasia,
-                      layerToggles.rotulosEmpresas || empresa.id === selectedEmpresaId,
-                    )}
-                    eventHandlers={{
-                      click: () => {
-                        if (selectedEmpresaId === empresa.id) {
-                          if (!panelsVisible.relatorio) {
-                            setReportCollapsed(false);
-                            setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
-                            return;
-                          }
-
-                          setSelectedEmpresaId(null);
-                          return;
-                        }
-
-                        setSelectedEmpresaId(empresa.id);
-                        setSelectedPontoInstitucionalId(null);
-                        setReportCollapsed(false);
-                        setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
-                      },
-                    }}
-                  >
-                    <Tooltip direction="top" offset={[0, -10]}>
-                      <div>
-                        <strong>{empresa.nomeFantasia}</strong>
-                        <br />
-                        <strong>Atividade:</strong> {empresa.descricaoCnae || empresa.cnaePrincipal}
-                      </div>
-                    </Tooltip>
-                  </Marker>
-                ));
-
-                // Clusters quando densidade compromete performance/legibilidade.
-                // Limite empirico (mecanica-hermes degradou em ~200 markers visiveis).
-                return visiveis.length > CLUSTER_THRESHOLD
-                  ? <MarkerClusterGroup chunkedLoading>{markers}</MarkerClusterGroup>
-                  : <>{markers}</>;
-              })()}
-
-              {layerToggles.pontosInstitucionais && pontosInstitucionaisFiltrados.map((ponto) => (
-                <Marker
-                  key={ponto.id}
-                  position={[ponto.latitude, ponto.longitude]}
-                  icon={createPontoInstitucionalMarkerIcon(
-                    ponto,
-                    ponto.id === selectedPontoInstitucionalId,
-                    layerToggles.rotulosEmpresas || ponto.id === selectedPontoInstitucionalId,
-                  )}
-                  eventHandlers={{
-                    click: () => {
-                      setSelectedPontoInstitucionalId(ponto.id);
-                      setSelectedEmpresaId(null);
-                      setReportCollapsed(false);
-                      setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
-                    },
-                  }}
-                >
-                  <Tooltip direction="top" offset={[0, -10]}>
-                    <div>
-                      <strong>{ponto.nome}</strong>
-                      <br />
-                      <strong>Atividade:</strong> {ponto.atividadesDisponiveis || ponto.descricao || "Não informada"}
-                    </div>
-                  </Tooltip>
-                </Marker>
-              ))}
-
-              {locationActive && userLocation && (
-                <Circle
-                  center={[userLocation.latitude, userLocation.longitude]}
-                  radius={220}
-                  pathOptions={{
-                    color: "#2563eb",
-                    fillColor: "#60a5fa",
-                    fillOpacity: 0.18,
-                    weight: 2,
-                  }}
-                />
-              )}
-
-              {routeEnabled && routePath.length > 1 && (
-                <Polyline
-                  positions={routePath}
-                  pathOptions={{
-                    color: "#1d4ed8",
-                    weight: 4,
-                    opacity: 0.85,
-                  }}
-                />
-              )}
-
-              {locationActive && userLocation && (
-                <Marker
-                  position={[userLocation.latitude, userLocation.longitude]}
-                  icon={L.icon({
-                    iconUrl: "https://raw.githubusercontent.com/pointhi/leaflet-color-markers/master/img/marker-icon-2x-blue.png",
-                    shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/0.7.7/images/marker-shadow.png",
-                    iconSize: [25, 41],
-                    iconAnchor: [12, 41],
-                    popupAnchor: [1, -34],
-                    shadowSize: [41, 41],
-                  })}
-                >
-                  <Tooltip direction="top" offset={[0, -10]}>
-                    <div>
-                      <strong>Sua localização</strong>
-                      <br />
-                      <small>Latitude: {userLocation.latitude.toFixed(5)}</small>
-                      <br />
-                      <small>Longitude: {userLocation.longitude.toFixed(5)}</small>
-                    </div>
-                  </Tooltip>
-                </Marker>
-              )}
+              <EmpresasMarkersLayer />
+              <PontosInstitucionaisMarkersLayer />
+              <RouteOverlay />
+              <UserLocationLayer />
             </MapContainer>
           </div>
 
