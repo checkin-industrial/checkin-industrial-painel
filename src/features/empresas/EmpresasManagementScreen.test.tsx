@@ -21,7 +21,7 @@ const EMPRESA_BASE = {
   matrizOuFilial: "Matriz",
   latitude: -22.3,
   longitude: -49.05,
-  ativo: true,
+  status: 1,
 };
 
 describe("EmpresasManagementScreen (smoke)", () => {
