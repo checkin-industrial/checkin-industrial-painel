@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { FilterPanel } from "./FilterPanel";
-import { MapContextProvider, type MapContextValue } from "../MapContext";
+import { MapContext, type MapContextValue } from "../MapContext";
 
 function buildContextValue(overrides: Partial<MapContextValue> = {}): MapContextValue {
   // Stub minimo: tudo no-op + estado default que faz o painel renderizar
@@ -73,7 +73,7 @@ describe("FilterPanel (smoke)", () => {
   it("nao renderiza quando panelsVisible.filtros = false", () => {
     const value = buildContextValue({ panelsVisible: { filtros: false, relatorio: false } });
     render(
-      <MapContextProvider value={value}>
+      <MapContext.Provider value={value}>
         <FilterPanel
           draggable={draggableStub}
           onFilterChange={vi.fn()}
@@ -85,7 +85,7 @@ describe("FilterPanel (smoke)", () => {
           error={null}
           pontosFiltradosCount={0}
         />
-      </MapContextProvider>,
+      </MapContext.Provider>,
     );
     expect(screen.queryByText("Filtros")).not.toBeInTheDocument();
   });
@@ -93,7 +93,7 @@ describe("FilterPanel (smoke)", () => {
   it("renderiza com headers das duas caixas (Empresas + Pontos Institucionais)", () => {
     const value = buildContextValue();
     render(
-      <MapContextProvider value={value}>
+      <MapContext.Provider value={value}>
         <FilterPanel
           draggable={draggableStub}
           onFilterChange={vi.fn()}
@@ -105,7 +105,7 @@ describe("FilterPanel (smoke)", () => {
           error={null}
           pontosFiltradosCount={0}
         />
-      </MapContextProvider>,
+      </MapContext.Provider>,
     );
     expect(screen.getByRole("heading", { name: /^Filtros$/i })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^Empresas$/i })).toBeInTheDocument();
@@ -116,7 +116,7 @@ describe("FilterPanel (smoke)", () => {
     const onClear = vi.fn();
     const value = buildContextValue();
     render(
-      <MapContextProvider value={value}>
+      <MapContext.Provider value={value}>
         <FilterPanel
           draggable={draggableStub}
           onFilterChange={vi.fn()}
@@ -128,7 +128,7 @@ describe("FilterPanel (smoke)", () => {
           error={null}
           pontosFiltradosCount={0}
         />
-      </MapContextProvider>,
+      </MapContext.Provider>,
     );
     fireEvent.click(screen.getByRole("button", { name: /Limpar/i }));
     expect(onClear).toHaveBeenCalledOnce();
@@ -138,7 +138,7 @@ describe("FilterPanel (smoke)", () => {
     const onFilterChange = vi.fn();
     const value = buildContextValue();
     render(
-      <MapContextProvider value={value}>
+      <MapContext.Provider value={value}>
         <FilterPanel
           draggable={draggableStub}
           onFilterChange={onFilterChange}
@@ -150,7 +150,7 @@ describe("FilterPanel (smoke)", () => {
           error={null}
           pontosFiltradosCount={0}
         />
-      </MapContextProvider>,
+      </MapContext.Provider>,
     );
     const setorSelect = screen.getByLabelText(/Setor/i);
     fireEvent.change(setorSelect, { target: { value: "industria" } });

@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { MapLegend } from "./MapLegend";
-import { MapContextProvider, type MapContextValue } from "../MapContext";
+import { MapContext, type MapContextValue } from "../MapContext";
 
 function buildContextValue(overrides: Partial<MapContextValue> = {}): MapContextValue {
   const noop = vi.fn();
@@ -72,9 +72,9 @@ describe("MapLegend (smoke)", () => {
 
   it("renderiza os botoes de camadas + paineis", () => {
     render(
-      <MapContextProvider value={buildContextValue()}>
+      <MapContext.Provider value={buildContextValue()}>
         <MapLegend {...defaultProps} />
-      </MapContextProvider>,
+      </MapContext.Provider>,
     );
     expect(screen.getByLabelText(/Mapa de Calor/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/Marcadores de Empresas/i)).toBeInTheDocument();
@@ -86,9 +86,9 @@ describe("MapLegend (smoke)", () => {
   it("click em Heatmap chama onToggleLayer('heatmap')", () => {
     const onToggleLayer = vi.fn();
     render(
-      <MapContextProvider value={buildContextValue()}>
+      <MapContext.Provider value={buildContextValue()}>
         <MapLegend {...defaultProps} onToggleLayer={onToggleLayer} />
-      </MapContextProvider>,
+      </MapContext.Provider>,
     );
     fireEvent.click(screen.getByLabelText(/Mapa de Calor/i));
     expect(onToggleLayer).toHaveBeenCalledWith("heatmap");
@@ -99,9 +99,9 @@ describe("MapLegend (smoke)", () => {
       layerToggles: { heatmap: false, marcadores: false, raioAnalise: false, rotulosEmpresas: false, pontosInstitucionais: false },
     });
     render(
-      <MapContextProvider value={value}>
+      <MapContext.Provider value={value}>
         <MapLegend {...defaultProps} />
-      </MapContextProvider>,
+      </MapContext.Provider>,
     );
     const btn = screen.getByLabelText(/Rótulos de Nomes/i) as HTMLButtonElement;
     expect(btn.disabled).toBe(true);

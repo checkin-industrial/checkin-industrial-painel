@@ -7,7 +7,7 @@ vi.mock("../../../shared/auth/AuthContext", () => ({
 }));
 
 import { NeighborhoodReportPanel } from "./NeighborhoodReportPanel";
-import { MapContextProvider, type MapContextValue } from "../MapContext";
+import { MapContext, type MapContextValue } from "../MapContext";
 import type { EmpresaVizinhancaResponse } from "../types";
 
 function buildContextValue(overrides: Partial<MapContextValue> = {}): MapContextValue {
@@ -87,9 +87,9 @@ const defaultProps = {
 
 function renderWithProviders(value: MapContextValue) {
   return render(
-    <MapContextProvider value={value}>
+    <MapContext.Provider value={value}>
       <NeighborhoodReportPanel {...defaultProps} />
-    </MapContextProvider>,
+    </MapContext.Provider>,
   );
 }
 
