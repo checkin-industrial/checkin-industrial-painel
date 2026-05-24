@@ -17,6 +17,7 @@ type EmpresaListItem = {
   matrizOuFilial: string;
   latitude: number;
   longitude: number;
+  ativo: boolean;
 };
 
 type EmpresaCreatePayload = {
@@ -36,6 +37,7 @@ type EmpresaCreatePayload = {
   latitude: number;
   longitude: number;
   situacaoCadastral: number;
+  ativo?: boolean;
 };
 
 type EmpresaDetalheResponse = {
@@ -57,6 +59,7 @@ type EmpresaDetalheResponse = {
   latitude: number;
   longitude: number;
   situacaoCadastral: number;
+  ativo?: boolean;
 };
 
 type EmpresaDetalheResponseRaw = EmpresaDetalheResponse & {
@@ -127,6 +130,7 @@ function sanitizeDigits(value: string) {
 export function EmpresasManagementScreen() {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
+  const [statusFiltro, setStatusFiltro] = useState<"ativos" | "inativos" | "todos">("ativos");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
@@ -150,9 +154,14 @@ export function EmpresasManagementScreen() {
     error: queryError,
     refetch: refetchEmpresas,
   } = useQuery({
-    queryKey: [EMPRESAS_QUERY_KEY, "list"],
+    queryKey: [EMPRESAS_QUERY_KEY, "list", statusFiltro],
     queryFn: async () => {
-      const data = await apiFetch<EmpresaListItem[]>("GET", "/api/empresas/filter");
+      const params = new URLSearchParams();
+      if (statusFiltro === "ativos") params.set("ativo", "true");
+      if (statusFiltro === "inativos") params.set("ativo", "false");
+      const qs = params.toString();
+      const url = qs ? `/api/empresas/filter?${qs}` : "/api/empresas/filter";
+      const data = await apiFetch<EmpresaListItem[]>("GET", url);
       return Array.isArray(data) ? data : [];
     },
   });
@@ -257,6 +266,7 @@ export function EmpresasManagementScreen() {
         latitude: Number(data.latitude),
         longitude: Number(data.longitude),
         situacaoCadastral: Number(data.situacaoCadastral) || 1,
+        ativo: data.ativo ?? true,
       };
       setFormData(nextFormData);
       setInitialModalForm(nextFormData);
@@ -336,6 +346,52 @@ export function EmpresasManagementScreen() {
     }
   }
 
+  async function handleReactivate(empresa: EmpresaListItem) {
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      // Reativacao precisa do registro completo (PUT eh substitutivo na API).
+      // Buscamos a empresa por id para nao perder campos nao listados em
+      // EmpresaListItem (razaoSocial, cnpj, numeroFuncionarios, ...).
+      const detalhe = await apiFetch<EmpresaDetalheResponseRaw>("GET", `/api/empresas/${empresa.id}`);
+      const enderecoResposta = [
+        detalhe.endereco,
+        detalhe.Endereco,
+        detalhe.logradouro,
+        detalhe.Logradouro,
+        detalhe.address,
+        detalhe.Address,
+      ].find((value) => typeof value === "string" && value.trim().length > 0) ?? "";
+
+      const payload: EmpresaCreatePayload = {
+        cnpj: detalhe.cnpj ?? "",
+        razaoSocial: detalhe.razaoSocial ?? "",
+        nomeFantasia: detalhe.nomeFantasia ?? "",
+        cnaePrincipal: detalhe.cnaePrincipal ?? "",
+        setor: Number(detalhe.setor) || 1,
+        porte: Number(detalhe.porte) || 2,
+        numeroFuncionarios: Number(detalhe.numeroFuncionarios) || 0,
+        endereco: enderecoResposta,
+        telefone: detalhe.telefone ?? "",
+        cep: detalhe.cep ?? "",
+        municipio: detalhe.municipio ?? "",
+        descricaoCnae: detalhe.descricaoCnae ?? "",
+        matrizOuFilial: Number(detalhe.matrizOuFilialCodigo) || 1,
+        latitude: Number(detalhe.latitude),
+        longitude: Number(detalhe.longitude),
+        situacaoCadastral: Number(detalhe.situacaoCadastral) || 1,
+        ativo: true,
+      };
+
+      await apiFetch("PUT", `/api/empresas/${empresa.id}`, { body: payload });
+      setSuccessMessage(`Empresa "${empresa.nomeFantasia}" reativada com sucesso.`);
+      await invalidateEmpresas();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao reativar empresa.");
+    }
+  }
+
   async function handleGeocodeFromAddress() {
     const endereco = formData.endereco.trim();
     if (!endereco) {
@@ -385,6 +441,15 @@ export function EmpresasManagementScreen() {
             onChange={(event) => setSearchTerm(event.target.value)}
             placeholder="Buscar por nome, CNAE, município, telefone ou CEP"
           />
+          <select
+            value={statusFiltro}
+            onChange={(event) => setStatusFiltro(event.target.value as "ativos" | "inativos" | "todos")}
+            aria-label="Filtro de status"
+          >
+            <option value="ativos">Somente ativas</option>
+            <option value="inativos">Somente inativas</option>
+            <option value="todos">Todas</option>
+          </select>
           <button type="button" className="btn-with-icon btn-action-new" onClick={handleOpenCreateModal}>
             Nova Empresa
           </button>
@@ -406,6 +471,7 @@ export function EmpresasManagementScreen() {
                 <th>CNAE</th>
                 <th>Município</th>
                 <th>Contato</th>
+                <th>Status</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -427,14 +493,23 @@ export function EmpresasManagementScreen() {
                     <span>{empresa.telefone || "-"}</span>
                     <small>CEP: {empresa.cep || "-"}</small>
                   </td>
+                  <td data-label="Status">{empresa.ativo ? "Ativa" : "Inativa"}</td>
                   <td data-label="Ações">
                     <div className="action-group">
                       <button type="button" className="warning btn-with-icon btn-action-edit" onClick={() => handleEdit(empresa.id)}>
                         Editar
                       </button>
-                      <button type="button" className="danger btn-with-icon btn-action-delete" onClick={() => handleDelete(empresa.id)}>
-                        Excluir
-                      </button>
+                      {empresa.ativo
+                        ? (
+                          <button type="button" className="danger btn-with-icon btn-action-delete" onClick={() => handleDelete(empresa.id)}>
+                            Excluir
+                          </button>
+                          )
+                        : (
+                          <button type="button" className="ghost btn-with-icon btn-action-reactivate" onClick={() => handleReactivate(empresa)}>
+                            Reativar
+                          </button>
+                          )}
                     </div>
                   </td>
                 </tr>
@@ -442,7 +517,7 @@ export function EmpresasManagementScreen() {
 
               {loadingList && filteredEmpresas.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="table-loading-cell">
+                  <td colSpan={8} className="table-loading-cell">
                     <div className="map-loading-spinner" />
                     <div className="map-loading-label">Carregando empresas...</div>
                   </td>
@@ -451,7 +526,7 @@ export function EmpresasManagementScreen() {
 
               {!loadingList && filteredEmpresas.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="empty-state">Nenhuma empresa encontrada para o filtro informado.</td>
+                  <td colSpan={8} className="empty-state">Nenhuma empresa encontrada para o filtro informado.</td>
                 </tr>
               )}
             </tbody>

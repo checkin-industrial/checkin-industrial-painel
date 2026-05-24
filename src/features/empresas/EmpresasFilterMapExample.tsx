@@ -308,8 +308,11 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
   } = useQuery({
     queryKey: ["empresas", "filter", effectiveFilters],
     queryFn: async () => {
-      const queryString = buildQueryString(effectiveFilters);
-      const endpoint = queryString ? `/api/empresas/filter?${queryString}` : "/api/empresas/filter";
+      // Widget publico sempre filtra ativo=true; empresas soft-deletadas (Ativo=false)
+      // so aparecem na tela de Gestao Admin -> dropdown "inativas".
+      const params = new URLSearchParams(buildQueryString(effectiveFilters));
+      params.set("ativo", "true");
+      const endpoint = `/api/empresas/filter?${params.toString()}`;
       const data = await apiFetch<EmpresaFilterMapItem[]>("GET", endpoint);
       return Array.isArray(data) ? data : [];
     },
