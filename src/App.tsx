@@ -34,6 +34,10 @@ export function App() {
   // Quando o usuario clica numa tab admin sem estar autenticado, guardamos
   // o destino aqui e abrimos o modal de login. Sucesso -> navega; cancela -> descarta.
   const [pendingAdminTab, setPendingAdminTab] = useState<DashboardTab | null>(null);
+  // Deep-link admin: id da empresa a ser editada ao chegar na tab "gestao".
+  // Setada quando admin clica em "Editar cadastro" no popup do mapa publico;
+  // EmpresasManagementScreen consome via prop e chama onEditConsumed pra limpar.
+  const [pendingEditEmpresaId, setPendingEditEmpresaId] = useState<string | null>(null);
   const gestaoMenuRef = useRef<HTMLDivElement | null>(null);
   const navigationRef = useRef<HTMLElement | null>(null);
 
@@ -87,6 +91,19 @@ export function App() {
     setActiveTab("mapa");
     setIsGestaoMenuOpen(false);
     setIsMobileMenuOpen(false);
+  }
+
+  function handleAdminEditEmpresaFromMap(empresaId: string) {
+    if (!isAuthenticated) {
+      // Defesa em profundidade: o botao so renderiza pra autenticados, mas se
+      // a sessao expirar entre o render e o click, cai aqui. Abre o LoginModal
+      // e segura o destino tanto pra tab quanto pra empresa.
+      setPendingAdminTab("gestao");
+      setPendingEditEmpresaId(empresaId);
+      return;
+    }
+    setPendingEditEmpresaId(empresaId);
+    setActiveTab("gestao");
   }
 
   function handleRouteToPointFromCards(point: { id: string; nome: string; latitude: number; longitude: number }) {
@@ -205,8 +222,18 @@ export function App() {
       </header>
 
       <main className={activeTab === "mapa" ? "page page-map" : "page"}>
-        {activeTab === "mapa" && <EmpresasFilterMapExample mapTargetPoint={mapTargetPoint} />}
-        {activeTab === "gestao" && <EmpresasManagementScreen />}
+        {activeTab === "mapa" && (
+          <EmpresasFilterMapExample
+            mapTargetPoint={mapTargetPoint}
+            onAdminEditEmpresa={handleAdminEditEmpresaFromMap}
+          />
+        )}
+        {activeTab === "gestao" && (
+          <EmpresasManagementScreen
+            pendingEditId={pendingEditEmpresaId}
+            onEditConsumed={() => setPendingEditEmpresaId(null)}
+          />
+        )}
         {activeTab === "gestao-pontos" && <PontosInstitucionaisManagementScreen />}
         {activeTab === "cards-pontos" && <PontosInstitucionaisCardsScreen onRouteToPoint={handleRouteToPointFromCards} />}
         {activeTab === "cards-telefones" && <TelefonesUteisCardsScreen />}

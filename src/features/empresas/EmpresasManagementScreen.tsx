@@ -152,7 +152,16 @@ function sanitizeDigits(value: string) {
   return value.replace(/\D/g, "");
 }
 
-export function EmpresasManagementScreen() {
+// Atalho admin do mapa publico: quando o usuario clica em "Editar cadastro"
+// no popup, App.tsx muda tab pra "gestao" e passa o id da empresa via pendingEditId.
+// Ao detectar a prop preenchida, abrimos automaticamente o modal de edicao
+// e chamamos onEditConsumed pra zerar o estado pai (evita reabrir em re-renders).
+type EmpresasManagementScreenProps = {
+  pendingEditId?: string | null;
+  onEditConsumed?: () => void;
+};
+
+export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: EmpresasManagementScreenProps = {}) {
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFiltro, setStatusFiltro] = useState<"ativo" | "inativo" | "aguardando-revisao" | "todos">("ativo");
@@ -255,6 +264,21 @@ export function EmpresasManagementScreen() {
       setSubmitting(false);
     }
   }
+
+  // Deep-link do mapa: ao detectar pendingEditId, abre o modal de edicao
+  // pra aquela empresa e notifica o pai pra zerar o pendingEditId (evita
+  // reabrir em cada re-render). Skip se modal ja esta aberto (defesa contra
+  // race no fechamento manual).
+  useEffect(() => {
+    if (!pendingEditId || isModalOpen) {
+      return;
+    }
+    handleEdit(pendingEditId);
+    onEditConsumed?.();
+    // handleEdit/onEditConsumed sao estaveis no escopo; eslint pediria adiciona-las
+    // mas isso geraria loop (handleEdit muda formData -> re-render -> dispara de novo).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pendingEditId]);
 
   async function handleEdit(id: string) {
     setError(null);
