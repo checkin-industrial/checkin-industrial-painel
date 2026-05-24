@@ -75,16 +75,15 @@ export type MapContextValue = {
   setUserLocation: React.Dispatch<React.SetStateAction<{ latitude: number; longitude: number } | null>>;
   locationActive: boolean;
   setLocationActive: React.Dispatch<React.SetStateAction<boolean>>;
+  // Rota: estado read-only (gerenciado pelo useRouteOSRM via TanStack Query).
+  // Container controla so o toggle (routeEnabled); path/loading/error/info sao
+  // derivados do query + pre-condicoes (sem setters mutaveis externos).
   routeEnabled: boolean;
   setRouteEnabled: React.Dispatch<React.SetStateAction<boolean>>;
   routePath: LatLngTuple[];
-  setRoutePath: React.Dispatch<React.SetStateAction<LatLngTuple[]>>;
   routeLoading: boolean;
-  setRouteLoading: React.Dispatch<React.SetStateAction<boolean>>;
   routeError: string | null;
-  setRouteError: React.Dispatch<React.SetStateAction<string | null>>;
   routeInfo: { distanceKm: number; durationMin: number } | null;
-  setRouteInfo: React.Dispatch<React.SetStateAction<{ distanceKm: number; durationMin: number } | null>>;
 
   // Atalho admin pra editar empresa direto do mapa
   onAdminEditEmpresa?: (empresaId: string) => void;

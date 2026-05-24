@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import type { LatLngTuple } from "../MapHelpers";
 
-// Hook que isola o calculo de rota via OSRM (router.project-osrm.org).
-// Recebe origem (userLocation) + destino (rotaDestino) + flag de ativacao
-// e gerencia routePath/routeLoading/routeError/routeInfo. Cancela fetch
-// pendente quando inputs mudam ou unmount.
+// Hook que isola o calculo de rota via OSRM (router.project-osrm.org) sobre
+// TanStack Query. queryKey baseada em origem+destino da cache + dedup, e o
+// AbortSignal do useQuery cuida da cancellation quando os inputs mudam ou
+// o componente desmonta.
 //
-// Validacao de pre-condicoes (userLocation/destino ausente) emite mensagem
-// pelo routeError. Container apenas exibe.
+// routeError e derivado: pre-condicoes (sem localizacao/destino) tem precedencia
+// sobre erros de fetch. Container nao precisa mais setar erro manualmente -
+// basta ligar routeEnabled e o hook calcula o resto.
 
 type UserLocationInput = { latitude: number; longitude: number } | null;
 
@@ -20,114 +21,91 @@ type UseRouteOSRMArgs = {
   destino: LatLngTuple | null;
 };
 
+type RouteResult = {
+  path: LatLngTuple[];
+  info: RouteInfo;
+};
+
 export function useRouteOSRM({
   routeEnabled,
   userLocation,
   locationActive,
   destino,
 }: UseRouteOSRMArgs) {
-  const [routePath, setRoutePath] = useState<LatLngTuple[]>([]);
-  const [routeLoading, setRouteLoading] = useState(false);
-  const [routeError, setRouteError] = useState<string | null>(null);
-  const [routeInfo, setRouteInfo] = useState<RouteInfo | null>(null);
+  const ready = routeEnabled && locationActive && !!userLocation && !!destino;
 
-  useEffect(() => {
-    if (!routeEnabled) {
-      setRouteLoading(false);
-      setRouteError(null);
-      setRoutePath([]);
-      setRouteInfo(null);
-      return;
-    }
+  const {
+    data,
+    isFetching: routeLoading,
+    error: queryError,
+  } = useQuery<RouteResult>({
+    queryKey: [
+      "route-osrm",
+      userLocation?.latitude,
+      userLocation?.longitude,
+      destino?.[0],
+      destino?.[1],
+    ],
+    enabled: ready,
+    // Rotas mudam pouco pra mesmo par origem/destino - vale o stale time alto.
+    staleTime: 5 * 60 * 1000,
+    queryFn: async ({ signal }) => {
+      // ready=true garante o nao-nulo, mas TS nao infere isso atraves de useQuery enabled.
+      const origem = userLocation!;
+      const [destinoLat, destinoLng] = destino!;
+      const endpoint = `https://router.project-osrm.org/route/v1/driving/${origem.longitude},${origem.latitude};${destinoLng},${destinoLat}?overview=full&geometries=geojson&steps=false`;
 
-    if (!locationActive || !userLocation) {
-      setRouteLoading(false);
-      setRoutePath([]);
-      setRouteInfo(null);
-      setRouteError("Ative sua localização para calcular a rota.");
-      return;
-    }
-
-    if (!destino) {
-      setRouteLoading(false);
-      setRoutePath([]);
-      setRouteInfo(null);
-      setRouteError("Selecione um ponto no mapa para traçar a rota.");
-      return;
-    }
-
-    const origemAtual = userLocation;
-    const destinoAtual = destino;
-
-    let cancelled = false;
-
-    async function fetchRoute() {
-      setRouteLoading(true);
-      setRouteError(null);
-
-      try {
-        const [origemLat, origemLng] = [origemAtual.latitude, origemAtual.longitude];
-        const [destinoLat, destinoLng] = destinoAtual;
-        const endpoint = `https://router.project-osrm.org/route/v1/driving/${origemLng},${origemLat};${destinoLng},${destinoLat}?overview=full&geometries=geojson&steps=false`;
-        const response = await fetch(endpoint);
-
-        if (!response.ok) {
-          throw new Error(`Falha ao calcular rota (${response.status})`);
-        }
-
-        const data = (await response.json()) as {
-          routes?: Array<{
-            distance: number;
-            duration: number;
-            geometry: { coordinates: Array<[number, number]> };
-          }>;
-        };
-
-        const route = data.routes?.[0];
-        if (!route?.geometry?.coordinates?.length) {
-          throw new Error("Rota indisponível para o destino selecionado.");
-        }
-
-        if (!cancelled) {
-          const coordinates = route.geometry.coordinates.map(
-            ([lng, lat]) => [lat, lng] as LatLngTuple,
-          );
-
-          setRoutePath(coordinates);
-          setRouteInfo({
-            distanceKm: route.distance / 1000,
-            durationMin: route.duration / 60,
-          });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setRoutePath([]);
-          setRouteInfo(null);
-          setRouteError(err instanceof Error ? err.message : "Não foi possível calcular a rota.");
-        }
-      } finally {
-        if (!cancelled) {
-          setRouteLoading(false);
-        }
+      const response = await fetch(endpoint, { signal });
+      if (!response.ok) {
+        throw new Error(`Falha ao calcular rota (${response.status})`);
       }
+
+      const payload = (await response.json()) as {
+        routes?: Array<{
+          distance: number;
+          duration: number;
+          geometry: { coordinates: Array<[number, number]> };
+        }>;
+      };
+
+      const route = payload.routes?.[0];
+      if (!route?.geometry?.coordinates?.length) {
+        throw new Error("Rota indisponível para o destino selecionado.");
+      }
+
+      const path = route.geometry.coordinates.map(
+        ([lng, lat]) => [lat, lng] as LatLngTuple,
+      );
+
+      return {
+        path,
+        info: { distanceKm: route.distance / 1000, durationMin: route.duration / 60 },
+      };
+    },
+  });
+
+  const routePath = data?.path ?? [];
+  const routeInfo = data?.info ?? null;
+
+  // Erros de pre-condicao tem precedencia (usuario nao habilitou localizacao,
+  // ou nao selecionou destino) - mensagens estaveis. Caso pre-condicoes ok,
+  // expoe a mensagem do fetch.
+  let routeError: string | null = null;
+  if (routeEnabled) {
+    if (!locationActive || !userLocation) {
+      routeError = "Ative sua localização para calcular a rota.";
+    } else if (!destino) {
+      routeError = "Selecione um ponto no mapa para traçar a rota.";
+    } else if (queryError instanceof Error) {
+      routeError = queryError.message;
     }
-
-    fetchRoute();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [locationActive, routeEnabled, destino, userLocation]);
+  }
 
   return {
     routePath,
-    setRoutePath,
-    routeLoading,
-    setRouteLoading,
+    routeLoading: ready && routeLoading,
     routeError,
-    setRouteError,
     routeInfo,
-    setRouteInfo,
   };
 }
 

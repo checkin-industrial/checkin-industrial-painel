@@ -427,13 +427,9 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
 
   const {
     routePath,
-    setRoutePath,
     routeLoading,
-    setRouteLoading,
     routeError,
-    setRouteError,
     routeInfo,
-    setRouteInfo,
   } = useRouteOSRM({
     routeEnabled,
     userLocation,
@@ -442,16 +438,11 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   });
 
   function handleRouteFromReportAddress() {
-    if (!rotaDestino) {
-      setRouteError("Selecione um ponto no mapa para traçar a rota.");
-      setRouteEnabled(false);
-      return;
-    }
-
+    // routeError sai derivado do hook ("Selecione um ponto..." quando rotaDestino=null)
+    // se o usuario tentar tracar rota sem selecionar destino. Sempre habilita pra
+    // surfacar o erro derivado ou avancar o fluxo se condicoes ok.
     setRouteEnabled(true);
-    setRouteError(null);
-
-    if (!userLocation) {
+    if (rotaDestino && !userLocation) {
       requestUserLocation();
     }
   }
@@ -578,13 +569,9 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
       routeEnabled,
       setRouteEnabled,
       routePath,
-      setRoutePath,
       routeLoading,
-      setRouteLoading,
       routeError,
-      setRouteError,
       routeInfo,
-      setRouteInfo,
       onAdminEditEmpresa,
     }),
     [
@@ -620,13 +607,9 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
       setLocationActive,
       routeEnabled,
       routePath,
-      setRoutePath,
       routeLoading,
-      setRouteLoading,
       routeError,
-      setRouteError,
       routeInfo,
-      setRouteInfo,
       onAdminEditEmpresa,
     ],
   );

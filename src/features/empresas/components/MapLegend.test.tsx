@@ -50,13 +50,9 @@ function buildContextValue(overrides: Partial<MapContextValue> = {}): MapContext
     routeEnabled: false,
     setRouteEnabled: noop,
     routePath: [],
-    setRoutePath: noop,
     routeLoading: false,
-    setRouteLoading: noop,
     routeError: null,
-    setRouteError: noop,
     routeInfo: null,
-    setRouteInfo: noop,
     ...overrides,
   };
 }
