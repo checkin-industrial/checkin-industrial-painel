@@ -5,30 +5,32 @@ import type { EmpresaCreatePayload } from "../types";
 // Re-exportado aqui pra evitar mexer em call sites antigos.
 export { INITIAL_FORM } from "../types";
 
+// Os valores correspondem aos nomes dos enums no backend (camelCase via
+// JsonStringEnumConverter). Mantemos labels PT-BR pra UI.
 const SETOR_OPTIONS = [
-  { value: 1, label: "Industria" },
-  { value: 2, label: "Comercio" },
-  { value: 3, label: "Servicos" },
+  { value: "industria", label: "Industria" },
+  { value: "comercio", label: "Comercio" },
+  { value: "servicos", label: "Servicos" },
 ];
 
 const PORTE_OPTIONS = [
-  { value: 1, label: "MEI" },
-  { value: 2, label: "ME" },
-  { value: 3, label: "EPP" },
-  { value: 4, label: "LTDA" },
-  { value: 5, label: "S/A" },
+  { value: "mei", label: "MEI" },
+  { value: "me", label: "ME" },
+  { value: "epp", label: "EPP" },
+  { value: "ltda", label: "LTDA" },
+  { value: "sa", label: "S/A" },
 ];
 
 const MATRIZ_FILIAL_OPTIONS = [
-  { value: 1, label: "Matriz" },
-  { value: 2, label: "Filial" },
+  { value: "matriz", label: "Matriz" },
+  { value: "filial", label: "Filial" },
 ];
 
 const SITUACAO_OPTIONS = [
-  { value: 1, label: "Ativa" },
-  { value: 2, label: "Inativa" },
-  { value: 3, label: "Suspensa" },
-  { value: 4, label: "Baixada" },
+  { value: "ativa", label: "Ativa" },
+  { value: "inativa", label: "Inativa" },
+  { value: "suspensa", label: "Suspensa" },
+  { value: "baixada", label: "Baixada" },
 ];
 
 type EmpresaFormModalProps = {
@@ -123,7 +125,7 @@ export function EmpresaFormModal({
               Setor
               <select
                 value={formData.setor}
-                onChange={(event) => setFormData((prev) => ({ ...prev, setor: Number(event.target.value) }))}
+                onChange={(event) => setFormData((prev) => ({ ...prev, setor: event.target.value }))}
               >
                 {SETOR_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -137,7 +139,7 @@ export function EmpresaFormModal({
               Porte
               <select
                 value={formData.porte}
-                onChange={(event) => setFormData((prev) => ({ ...prev, porte: Number(event.target.value) }))}
+                onChange={(event) => setFormData((prev) => ({ ...prev, porte: event.target.value }))}
               >
                 {PORTE_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
@@ -198,7 +200,7 @@ export function EmpresaFormModal({
               <select
                 value={formData.matrizOuFilial}
                 onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, matrizOuFilial: Number(event.target.value) }))
+                  setFormData((prev) => ({ ...prev, matrizOuFilial: event.target.value }))
                 }
               >
                 {MATRIZ_FILIAL_OPTIONS.map((option) => (
@@ -214,7 +216,7 @@ export function EmpresaFormModal({
               <select
                 value={formData.situacaoCadastral}
                 onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, situacaoCadastral: Number(event.target.value) }))
+                  setFormData((prev) => ({ ...prev, situacaoCadastral: event.target.value }))
                 }
               >
                 {SITUACAO_OPTIONS.map((option) => (

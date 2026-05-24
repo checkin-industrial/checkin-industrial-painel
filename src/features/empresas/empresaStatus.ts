@@ -3,16 +3,16 @@
 // arquivos exportados pra Fast Refresh devem exportar apenas componentes;
 // const/type/funcoes ao lado quebram o HMR.
 //
-// Reflete StatusEmpresa do backend (int enum). Painel mantem como numero
-// pra evitar serializacao customizada no .NET.
+// Reflete StatusEmpresa do backend (enum serializado como string camelCase
+// via JsonStringEnumConverter). Antes do PR coordenado API+painel, eram ints.
 
 export const STATUS = {
-  Ativo: 1,
-  Inativo: 2,
-  AguardandoRevisao: 3,
+  Ativo: "ativo",
+  Inativo: "inativo",
+  AguardandoRevisao: "aguardandoRevisao",
 } as const;
 
-export type StatusEmpresa = 1 | 2 | 3;
+export type StatusEmpresa = (typeof STATUS)[keyof typeof STATUS];
 
 export function statusLabel(status: StatusEmpresa): string {
   switch (status) {
