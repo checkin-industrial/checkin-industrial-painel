@@ -11,6 +11,7 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { createEmpresaMarkerIcon } from "./EmpresaMarker";
 import { useDraggable } from "../../shared/hooks/useDraggable";
 import { useAuth } from "../../shared/auth/AuthContext";
+import { MapContextProvider, type MapContextValue } from "./MapContext";
 import {
   DEFAULT_CENTER,
   DEFAULT_ZOOM,
@@ -701,7 +702,99 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   const filtersPanelDraggable = useDraggable("filters-panel");
   const reportPanelDraggable = useDraggable("report-panel");
 
+  // Bundle do state para sub-componentes via Context. Memo evita value novo
+  // a cada render (re-render desnecessario nos consumers).
+  const mapContextValue: MapContextValue = useMemo(
+    () => ({
+      empresas,
+      pontosInstitucionais,
+      vizinhanca,
+      reportLoading,
+      reportError,
+      filters,
+      setFilters,
+      empresaBuscaAtiva,
+      setEmpresaBuscaAtiva,
+      cnaeOptions,
+      municipioOptions,
+      pontoFilters,
+      setPontoFilters,
+      pontosBuscaAtiva,
+      setPontosBuscaAtiva,
+      selectedEmpresaId,
+      setSelectedEmpresaId,
+      selectedPontoInstitucionalId,
+      setSelectedPontoInstitucionalId,
+      layerToggles,
+      setLayerToggles,
+      panelsVisible,
+      setPanelsVisible,
+      filtersCollapsed,
+      setFiltersCollapsed,
+      reportCollapsed,
+      setReportCollapsed,
+      empresaFiltersCollapsed,
+      setEmpresaFiltersCollapsed,
+      pontosFiltersCollapsed,
+      setPontosFiltersCollapsed,
+      empresaFiltersVisible,
+      setEmpresaFiltersVisible,
+      pontosFiltersVisible,
+      setPontosFiltersVisible,
+      collapsedReportSections,
+      setCollapsedReportSections,
+      userLocation,
+      setUserLocation,
+      locationActive,
+      setLocationActive,
+      routeEnabled,
+      setRouteEnabled,
+      routePath,
+      setRoutePath,
+      routeLoading,
+      setRouteLoading,
+      routeError,
+      setRouteError,
+      routeInfo,
+      setRouteInfo,
+      onAdminEditEmpresa,
+    }),
+    [
+      empresas,
+      pontosInstitucionais,
+      vizinhanca,
+      reportLoading,
+      reportError,
+      filters,
+      empresaBuscaAtiva,
+      cnaeOptions,
+      municipioOptions,
+      pontoFilters,
+      pontosBuscaAtiva,
+      selectedEmpresaId,
+      selectedPontoInstitucionalId,
+      layerToggles,
+      panelsVisible,
+      filtersCollapsed,
+      reportCollapsed,
+      empresaFiltersCollapsed,
+      pontosFiltersCollapsed,
+      empresaFiltersVisible,
+      pontosFiltersVisible,
+      collapsedReportSections,
+      userLocation,
+      locationActive,
+      routeEnabled,
+      routePath,
+      routeLoading,
+      routeError,
+      routeInfo,
+      onAdminEditEmpresa,
+    ],
+  );
+
   return (
+    <MapContextProvider value={mapContextValue}>
     <section className="map-dashboard-layout">
       <section className="map-main-panel">
         <div className={isMapFullscreen ? "map-stage is-fullscreen" : "map-stage"} ref={mapStageRef}>
@@ -1477,5 +1570,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
       </section>
 
     </section>
+    </MapContextProvider>
   );
 }
