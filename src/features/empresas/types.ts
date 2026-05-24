@@ -110,23 +110,28 @@ export type EmpresaListItem = {
   status: StatusEmpresa;
 };
 
+// Enums sao serializados pela API como string camelCase (JsonStringEnumConverter).
+// Setor: "industria" | "comercio" | "servicos"
+// Porte: "mei" | "me" | "epp" | "ltda" | "sa"
+// MatrizOuFilial: "matriz" | "filial"
+// SituacaoCadastral: "ativa" | "inativa" | "suspensa" | "baixada"
 export type EmpresaCreatePayload = {
   cnpj: string;
   razaoSocial: string;
   nomeFantasia: string;
   cnaePrincipal: string;
-  setor: number;
-  porte: number;
+  setor: string;
+  porte: string;
   numeroFuncionarios: number;
   endereco: string;
   telefone: string;
   cep: string;
   municipio: string;
   descricaoCnae: string;
-  matrizOuFilial: number;
+  matrizOuFilial: string;
   latitude: number;
   longitude: number;
-  situacaoCadastral: number;
+  situacaoCadastral: string;
   status?: StatusEmpresa;
 };
 
@@ -137,8 +142,8 @@ export type EmpresaDetalheResponseRaw = {
   nomeFantasia: string;
   cnaePrincipal: string;
   descricaoCnae: string;
-  setor: number;
-  porte: number;
+  setor: string;
+  porte: string;
   numeroFuncionarios: number;
   endereco?: string;
   Endereco?: string;
@@ -149,10 +154,10 @@ export type EmpresaDetalheResponseRaw = {
   telefone: string;
   cep: string;
   municipio: string;
-  matrizOuFilialCodigo?: number;
+  matrizOuFilialCodigo?: string;
   latitude: number;
   longitude: number;
-  situacaoCadastral: number;
+  situacaoCadastral: string;
   status?: StatusEmpresa;
 };
 
@@ -174,16 +179,16 @@ export const INITIAL_FORM: EmpresaCreatePayload = {
   razaoSocial: "",
   nomeFantasia: "",
   cnaePrincipal: "",
-  setor: 1,
-  porte: 2,
+  setor: "industria",
+  porte: "me",
   numeroFuncionarios: 0,
   endereco: "",
   telefone: "",
   cep: "",
   municipio: "",
   descricaoCnae: "",
-  matrizOuFilial: 1,
+  matrizOuFilial: "matriz",
   latitude: -22.6,
   longitude: -48.8,
-  situacaoCadastral: 1,
+  situacaoCadastral: "ativa",
 };

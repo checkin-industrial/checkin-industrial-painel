@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
-import { STATUS, type StatusEmpresa } from "./empresaStatus";
+import { STATUS } from "./empresaStatus";
 import type {
   EmpresaCreatePayload,
   EmpresaDetalheResponseRaw,
@@ -168,19 +168,19 @@ export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: Empr
         razaoSocial: data.razaoSocial ?? "",
         nomeFantasia: data.nomeFantasia ?? "",
         cnaePrincipal: data.cnaePrincipal ?? "",
-        setor: Number(data.setor) || 1,
-        porte: Number(data.porte) || 2,
+        setor: data.setor ?? "industria",
+        porte: data.porte ?? "me",
         numeroFuncionarios: Number(data.numeroFuncionarios) || 0,
         endereco: enderecoResposta,
         telefone: data.telefone ?? "",
         cep: data.cep ?? "",
         municipio: data.municipio ?? "",
         descricaoCnae: data.descricaoCnae ?? "",
-        matrizOuFilial: Number(data.matrizOuFilialCodigo) || 1,
+        matrizOuFilial: data.matrizOuFilialCodigo ?? "matriz",
         latitude: Number(data.latitude),
         longitude: Number(data.longitude),
-        situacaoCadastral: Number(data.situacaoCadastral) || 1,
-        status: (data.status ?? STATUS.Ativo) as StatusEmpresa,
+        situacaoCadastral: data.situacaoCadastral ?? "ativa",
+        status: data.status ?? STATUS.Ativo,
       };
       setFormData(nextFormData);
       setInitialModalForm(nextFormData);
@@ -283,18 +283,18 @@ export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: Empr
         razaoSocial: detalhe.razaoSocial ?? "",
         nomeFantasia: detalhe.nomeFantasia ?? "",
         cnaePrincipal: detalhe.cnaePrincipal ?? "",
-        setor: Number(detalhe.setor) || 1,
-        porte: Number(detalhe.porte) || 2,
+        setor: detalhe.setor ?? "industria",
+        porte: detalhe.porte ?? "me",
         numeroFuncionarios: Number(detalhe.numeroFuncionarios) || 0,
         endereco: enderecoResposta,
         telefone: detalhe.telefone ?? "",
         cep: detalhe.cep ?? "",
         municipio: detalhe.municipio ?? "",
         descricaoCnae: detalhe.descricaoCnae ?? "",
-        matrizOuFilial: Number(detalhe.matrizOuFilialCodigo) || 1,
+        matrizOuFilial: detalhe.matrizOuFilialCodigo ?? "matriz",
         latitude: Number(detalhe.latitude),
         longitude: Number(detalhe.longitude),
-        situacaoCadastral: Number(detalhe.situacaoCadastral) || 1,
+        situacaoCadastral: detalhe.situacaoCadastral ?? "ativa",
         status: STATUS.Ativo,
       };
 
