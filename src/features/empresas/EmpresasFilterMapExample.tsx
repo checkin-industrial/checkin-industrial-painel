@@ -1,13 +1,16 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
-import { Circle, MapContainer, TileLayer, ZoomControl } from "react-leaflet";
+// `leaflet.heat` e `leaflet.markercluster` se acoplam na global `L` exposta pelo
+// pacote `leaflet`. O `import "leaflet"` precisa rodar ANTES dos plugins pra
+// que `window.L` exista no momento do `leaflet.heat` registrar `L.heatLayer`.
+import "leaflet";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
 import "leaflet.markercluster/dist/MarkerCluster.css";
 import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { useDraggable } from "../../shared/hooks/useDraggable";
-import { MapContext, type MapContextValue } from "./MapContext";
+import { MapContext } from "./MapContext";
 import { useFiltrosEmpresas } from "./hooks/useFiltrosEmpresas";
 import { useUserLocation } from "./hooks/useUserLocation";
 import { useRouteOSRM } from "./hooks/useRouteOSRM";
@@ -17,14 +20,12 @@ import { useMapDeepLink } from "./hooks/useMapDeepLink";
 import { useCnaeMunicipioOptions } from "./hooks/useCnaeMunicipioOptions";
 import { useEmpresaMapSelectionEffects } from "./hooks/useEmpresaMapSelectionEffects";
 import { useMapDerivedSelection } from "./hooks/useMapDerivedSelection";
+import { useMapContextValue } from "./hooks/useMapContextValue";
 import { FilterPanel } from "./components/FilterPanel";
 import { NeighborhoodReportPanel } from "./components/NeighborhoodReportPanel";
 import { MapLegend } from "./components/MapLegend";
-import { EmpresasMarkersLayer } from "./components/EmpresasMarkersLayer";
-import { PontosInstitucionaisMarkersLayer } from "./components/PontosInstitucionaisMarkersLayer";
-import { UserLocationLayer } from "./components/UserLocationLayer";
-import { RouteOverlay } from "./components/RouteOverlay";
-import { DEFAULT_ZOOM, HeatmapLayer, type LatLngTuple, MapFocusTarget, MapViewport } from "./MapHelpers";
+import { MapStage } from "./components/MapStage";
+import type { LatLngTuple } from "./MapHelpers";
 
 // Types movidos pra ./types.ts (compartilhados com sub-componentes).
 // MapHelpers.tsx mantem LeafletHeatLayer, HeatmapPointTuple, LatLngTuple.
@@ -253,98 +254,58 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   const filtersPanelDraggable = useDraggable("filters-panel");
   const reportPanelDraggable = useDraggable("report-panel");
 
-  // Bundle do state para sub-componentes via Context. Memo evita value novo
-  // a cada render (re-render desnecessario nos consumers).
-  const mapContextValue: MapContextValue = useMemo(
-    () => ({
-      empresas,
-      pontosInstitucionais,
-      vizinhanca,
-      reportLoading,
-      reportError,
-      filters,
-      setFilters,
-      empresaBuscaAtiva,
-      setEmpresaBuscaAtiva,
-      cnaeOptions,
-      municipioOptions,
-      pontoFilters,
-      setPontoFilters,
-      pontosBuscaAtiva,
-      setPontosBuscaAtiva,
-      selectedEmpresaId,
-      setSelectedEmpresaId,
-      selectedPontoInstitucionalId,
-      setSelectedPontoInstitucionalId,
-      layerToggles,
-      setLayerToggles,
-      panelsVisible,
-      setPanelsVisible,
-      filtersCollapsed,
-      setFiltersCollapsed,
-      reportCollapsed,
-      setReportCollapsed,
-      empresaFiltersCollapsed,
-      setEmpresaFiltersCollapsed,
-      pontosFiltersCollapsed,
-      setPontosFiltersCollapsed,
-      empresaFiltersVisible,
-      setEmpresaFiltersVisible,
-      pontosFiltersVisible,
-      setPontosFiltersVisible,
-      collapsedReportSections,
-      setCollapsedReportSections,
-      userLocation,
-      setUserLocation,
-      locationActive,
-      setLocationActive,
-      routeEnabled,
-      setRouteEnabled,
-      routePath,
-      routeLoading,
-      routeError,
-      routeInfo,
-      onAdminEditEmpresa,
-    }),
-    [
-      empresas,
-      pontosInstitucionais,
-      vizinhanca,
-      reportLoading,
-      reportError,
-      filters,
-      setFilters,
-      empresaBuscaAtiva,
-      setEmpresaBuscaAtiva,
-      cnaeOptions,
-      municipioOptions,
-      pontoFilters,
-      setPontoFilters,
-      pontosBuscaAtiva,
-      setPontosBuscaAtiva,
-      selectedEmpresaId,
-      selectedPontoInstitucionalId,
-      layerToggles,
-      panelsVisible,
-      filtersCollapsed,
-      reportCollapsed,
-      empresaFiltersCollapsed,
-      pontosFiltersCollapsed,
-      empresaFiltersVisible,
-      pontosFiltersVisible,
-      collapsedReportSections,
-      userLocation,
-      setUserLocation,
-      locationActive,
-      setLocationActive,
-      routeEnabled,
-      routePath,
-      routeLoading,
-      routeError,
-      routeInfo,
-      onAdminEditEmpresa,
-    ],
-  );
+  // Bundle do state para sub-componentes via Context. Hook memoiza o value
+  // - mudar qualquer campo recria o objeto e re-renderiza consumers.
+  const mapContextValue = useMapContextValue({
+    empresas,
+    pontosInstitucionais,
+    vizinhanca,
+    reportLoading,
+    reportError,
+    filters,
+    setFilters,
+    empresaBuscaAtiva,
+    setEmpresaBuscaAtiva,
+    cnaeOptions,
+    municipioOptions,
+    pontoFilters,
+    setPontoFilters,
+    pontosBuscaAtiva,
+    setPontosBuscaAtiva,
+    selectedEmpresaId,
+    setSelectedEmpresaId,
+    selectedPontoInstitucionalId,
+    setSelectedPontoInstitucionalId,
+    layerToggles,
+    setLayerToggles,
+    panelsVisible,
+    setPanelsVisible,
+    filtersCollapsed,
+    setFiltersCollapsed,
+    reportCollapsed,
+    setReportCollapsed,
+    empresaFiltersCollapsed,
+    setEmpresaFiltersCollapsed,
+    pontosFiltersCollapsed,
+    setPontosFiltersCollapsed,
+    empresaFiltersVisible,
+    setEmpresaFiltersVisible,
+    pontosFiltersVisible,
+    setPontosFiltersVisible,
+    collapsedReportSections,
+    setCollapsedReportSections,
+    userLocation,
+    setUserLocation,
+    locationActive,
+    setLocationActive,
+    routeEnabled,
+    setRouteEnabled,
+    routePath,
+    routeLoading,
+    routeError,
+    routeInfo,
+    onAdminEditEmpresa,
+  });
 
   return (
     <MapContext.Provider value={mapContextValue}>
@@ -376,46 +337,18 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
             onToggleReportSection={toggleReportSection}
           />
 
-          <div className="map-wrapper">
-            {(loading || heatmapLoading) && (
-              <div className="map-loading-overlay">
-                <div className="map-loading-spinner" />
-                <span className="map-loading-label">
-                  {heatmapLoading && !loading ? "Carregando mapa de calor…" : "Carregando empresas…"}
-                </span>
-              </div>
-            )}
-            <MapContainer
-              center={center}
-              zoom={DEFAULT_ZOOM}
-              zoomControl={false}
-              style={{ height: isMapFullscreen ? "100%" : "calc(100vh - 56px)", width: "100%" }}
-            >
-              <MapFocusTarget target={mapFocusTarget} />
-              <ZoomControl position="bottomright" />
-              <TileLayer
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-              />
-
-              <MapViewport empresas={empresas} autoFit={layerToggles.marcadores} />
-
-              {layerToggles.heatmap && <HeatmapLayer points={heatmapPoints} />}
-
-              {layerToggles.raioAnalise && (empresaSelecionadaNoMapa || vizinhanca?.empresaBase) && (
-                <Circle
-                  center={analysisCenter}
-                  radius={5000}
-                  pathOptions={{ color: "#7c3aed", fillColor: "#7c3aed", fillOpacity: 0.06, weight: 2 }}
-                />
-              )}
-
-              <EmpresasMarkersLayer />
-              <PontosInstitucionaisMarkersLayer />
-              <RouteOverlay />
-              <UserLocationLayer />
-            </MapContainer>
-          </div>
+          <MapStage
+            center={center}
+            isMapFullscreen={isMapFullscreen}
+            mapFocusTarget={mapFocusTarget}
+            loading={loading}
+            heatmapLoading={heatmapLoading}
+            heatmapPoints={heatmapPoints}
+            analysisCenter={analysisCenter}
+            showRaioAnalise={
+              layerToggles.raioAnalise && Boolean(empresaSelecionadaNoMapa || vizinhanca?.empresaBase)
+            }
+          />
 
           <MapLegend
             isMapFullscreen={isMapFullscreen}
