@@ -3,8 +3,11 @@ import { useQuery } from "@tanstack/react-query";
 import { apiFetch, staticUrl } from "../../shared/api/apiClient";
 import L from "leaflet";
 import { Circle, MapContainer, Marker, Polyline, TileLayer, Tooltip, ZoomControl } from "react-leaflet";
+import MarkerClusterGroup from "react-leaflet-markercluster";
 import "leaflet/dist/leaflet.css";
 import "leaflet.heat";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { createEmpresaMarkerIcon } from "./EmpresaMarker";
 import { useDraggable } from "../../shared/hooks/useDraggable";
 import {
@@ -120,6 +123,9 @@ type LayerToggleState = {
   rotulosEmpresas: boolean;
   pontosInstitucionais: boolean;
 };
+
+// Acima desse N de markers visiveis, agrupa em clusters automaticamente.
+const CLUSTER_THRESHOLD = 200;
 
 const SETOR_OPTIONS = [
   { value: "", label: "Todos" },
@@ -1290,47 +1296,56 @@ export function EmpresasFilterMapExample({ mapTargetPoint }: EmpresasFilterMapEx
                 />
               )}
 
-              {layerToggles.marcadores && empresas
-                .filter((empresa) => isCoordinateInsideViewportWindow(empresa.latitude, empresa.longitude))
-                .map((empresa) => (
-                <Marker
-                  key={empresa.id}
-                  position={[empresa.latitude, empresa.longitude]}
-                  icon={createEmpresaMarkerIcon(
-                    empresa.setor,
-                    empresa.id === selectedEmpresaId,
-                    empresa.nomeFantasia,
-                    layerToggles.rotulosEmpresas || empresa.id === selectedEmpresaId,
-                  )}
-                  eventHandlers={{
-                    click: () => {
-                      if (selectedEmpresaId === empresa.id) {
-                        if (!panelsVisible.relatorio) {
-                          setReportCollapsed(false);
-                          setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
+              {layerToggles.marcadores && (() => {
+                const visiveis = empresas.filter((empresa) =>
+                  isCoordinateInsideViewportWindow(empresa.latitude, empresa.longitude),
+                );
+                const markers = visiveis.map((empresa) => (
+                  <Marker
+                    key={empresa.id}
+                    position={[empresa.latitude, empresa.longitude]}
+                    icon={createEmpresaMarkerIcon(
+                      empresa.setor,
+                      empresa.id === selectedEmpresaId,
+                      empresa.nomeFantasia,
+                      layerToggles.rotulosEmpresas || empresa.id === selectedEmpresaId,
+                    )}
+                    eventHandlers={{
+                      click: () => {
+                        if (selectedEmpresaId === empresa.id) {
+                          if (!panelsVisible.relatorio) {
+                            setReportCollapsed(false);
+                            setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
+                            return;
+                          }
+
+                          setSelectedEmpresaId(null);
                           return;
                         }
 
-                        setSelectedEmpresaId(null);
-                        return;
-                      }
+                        setSelectedEmpresaId(empresa.id);
+                        setSelectedPontoInstitucionalId(null);
+                        setReportCollapsed(false);
+                        setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
+                      },
+                    }}
+                  >
+                    <Tooltip direction="top" offset={[0, -10]}>
+                      <div>
+                        <strong>{empresa.nomeFantasia}</strong>
+                        <br />
+                        <strong>Atividade:</strong> {empresa.descricaoCnae || empresa.cnaePrincipal}
+                      </div>
+                    </Tooltip>
+                  </Marker>
+                ));
 
-                      setSelectedEmpresaId(empresa.id);
-                      setSelectedPontoInstitucionalId(null);
-                      setReportCollapsed(false);
-                      setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
-                    },
-                  }}
-                >
-                  <Tooltip direction="top" offset={[0, -10]}>
-                    <div>
-                      <strong>{empresa.nomeFantasia}</strong>
-                      <br />
-                      <strong>Atividade:</strong> {empresa.descricaoCnae || empresa.cnaePrincipal}
-                    </div>
-                  </Tooltip>
-                </Marker>
-              ))}
+                // Clusters quando densidade compromete performance/legibilidade.
+                // Limite empirico (mecanica-hermes degradou em ~200 markers visiveis).
+                return visiveis.length > CLUSTER_THRESHOLD
+                  ? <MarkerClusterGroup chunkedLoading>{markers}</MarkerClusterGroup>
+                  : <>{markers}</>;
+              })()}
 
               {layerToggles.pontosInstitucionais && pontosInstitucionaisFiltrados.map((ponto) => (
                 <Marker
