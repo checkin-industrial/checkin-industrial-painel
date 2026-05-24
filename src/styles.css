@@ -803,17 +803,8 @@ button {
   margin-bottom: 8px;
 }
 
-.color-field-group {
-  display: grid;
-  grid-template-columns: 60px 1fr;
-  gap: 8px;
-  align-items: center;
-}
-
-.color-field-group input[type="color"] {
-  height: 38px;
-  padding: 2px;
-}
+/* .color-field-group + .upload-preview* movidos para
+   PontosInstitucionaisManagementScreen.module.css */
 
 .company-form input,
 .company-form select,
@@ -1590,41 +1581,7 @@ button {
 /* .map-phones-overlay (~100 linhas) removido: dead code apos refactor antigo
    da feature de telefones; nenhum TSX referenciava as classes. */
 
-.upload-preview {
-  border: 1px dashed #93c5fd;
-  border-radius: 10px;
-  background: #f8fbff;
-  padding: 10px;
-  display: grid;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.upload-preview span {
-  font-size: 0.84rem;
-  color: #1e3a8a;
-  font-weight: 600;
-}
-
-.upload-preview img {
-  width: 96px;
-  height: 96px;
-  object-fit: cover;
-  border-radius: 12px;
-  border: 1px solid #bfdbfe;
-  background: #ffffff;
-}
-
-.upload-preview--logo img {
-  object-fit: contain;
-  padding: 6px;
-}
-
-.upload-preview--cover img {
-  width: 100%;
-  height: 160px;
-  object-fit: cover;
-}
+/* .upload-preview* movido para PontosInstitucionaisManagementScreen.module.css */
 
 .cards-page {
   display: grid;

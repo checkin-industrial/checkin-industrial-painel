@@ -3,6 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 const PONTOS_QUERY_KEY = "pontos-institucionais";
 import { apiFetch, apiUrl, staticUrl } from "../../shared/api/apiClient";
+import styles from "./PontosInstitucionaisManagementScreen.module.css";
 
 type PontoInstitucionalListItem = {
   id: string;
@@ -739,7 +740,7 @@ export function PontosInstitucionaisManagementScreen() {
 
                 <label>
                   Cor do marcador
-                  <div className="color-field-group">
+                  <div className={styles["color-field-group"]}>
                     <input
                       type="color"
                       value={formData.corMarcador}
@@ -904,7 +905,7 @@ export function PontosInstitucionaisManagementScreen() {
               </label>
 
               {formData.responsavelFotoUrl && (
-                <div className="upload-preview">
+                <div className={styles["upload-preview"]}>
                   <span>Pré-visualização da foto do responsável</span>
                   <img src={staticUrl(formData.responsavelFotoUrl)} alt="Foto do responsável" loading="lazy" />
                 </div>
@@ -933,7 +934,7 @@ export function PontosInstitucionaisManagementScreen() {
               </label>
 
               {formData.logoUrl && (
-                <div className="upload-preview upload-preview--logo">
+                <div className={`${styles["upload-preview"]} ${styles["upload-preview--logo"]}`}>
                   <span>Pré-visualização do logo</span>
                   <img src={staticUrl(formData.logoUrl)} alt="Logo do ponto" loading="lazy" />
                 </div>
@@ -962,7 +963,7 @@ export function PontosInstitucionaisManagementScreen() {
               </label>
 
               {formData.cardFotoUrl && (
-                <div className="upload-preview upload-preview--cover">
+                <div className={`${styles["upload-preview"]} ${styles["upload-preview--cover"]}`}>
                   <span>Pré-visualização da imagem do card</span>
                   <img src={staticUrl(formData.cardFotoUrl)} alt="Foto principal do card" loading="lazy" />
                 </div>
