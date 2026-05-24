@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch, staticUrl } from "../../shared/api/apiClient";
+import styles from "./PontosInstitucionaisCardsScreen.module.css";
 
 type PontoInstitucionalCardItem = {
   id: string;
@@ -185,22 +186,22 @@ export function PontosInstitucionaisCardsScreen({ onRouteToPoint }: PontosInstit
           return (
             <article
               key={item.id}
-              className={isFlipped ? "institution-card is-flipped" : "institution-card"}
+              className={isFlipped ? `${styles["institution-card"]} ${styles["is-flipped"]}` : styles["institution-card"]}
             >
-              <div className="institution-card-inner">
-                <div className="institution-card-front">
-                  <div className="institution-card-media">
+              <div className={styles["institution-card-inner"]}>
+                <div className={styles["institution-card-front"]}>
+                  <div className={styles["institution-card-media"]}>
                     {imageUrl
                       ? <img src={imageUrl} alt={`Imagem de ${item.nome}`} loading="lazy" />
-                      : <div className="institution-card-placeholder">Sem imagem</div>}
-                    <span className="institution-card-badge">{tipoLabel(item.tipo)}</span>
+                      : <div className={styles["institution-card-placeholder"]}>Sem imagem</div>}
+                    <span className={styles["institution-card-badge"]}>{tipoLabel(item.tipo)}</span>
                   </div>
 
-                  <div className="institution-card-body">
-                    <div className="institution-card-title-row">
+                  <div className={styles["institution-card-body"]}>
+                    <div className={styles["institution-card-title-row"]}>
                       {item.logoUrl && (
                         <img
-                          className="institution-card-name-logo"
+                          className={styles["institution-card-name-logo"]}
                           src={staticUrl(item.logoUrl)}
                           alt={`Logo de ${item.nome}`}
                           loading="lazy"
@@ -208,14 +209,14 @@ export function PontosInstitucionaisCardsScreen({ onRouteToPoint }: PontosInstit
                       )}
                       <h3>{item.nome}</h3>
                     </div>
-                    <div className="institution-card-description-line">
+                    <div className={styles["institution-card-description-line"]}>
                       <p>{item.descricao}</p>
                     </div>
 
-                    <p className="institution-card-address">{item.endereco}</p>
+                    <p className={styles["institution-card-address"]}>{item.endereco}</p>
                     <button
                       type="button"
-                      className="institution-card-flip-btn"
+                      className={styles["institution-card-flip-btn"]}
                       onClick={() => setFlippedCardId(item.id)}
                       aria-label={`Virar card ${item.nome}`}
                     >
@@ -224,28 +225,28 @@ export function PontosInstitucionaisCardsScreen({ onRouteToPoint }: PontosInstit
                   </div>
                 </div>
 
-                <div className="institution-card-back">
-                  <div className="institution-card-body">
-                    <div className="institution-card-back-top">
+                <div className={styles["institution-card-back"]}>
+                  <div className={styles["institution-card-body"]}>
+                    <div className={styles["institution-card-back-top"]}>
                       <h3>{item.nome}</h3>
                       {responsavelFotoUrl ? (
                         <img
                           src={responsavelFotoUrl}
                           alt={`Foto do responsável por ${item.nome}`}
                           loading="lazy"
-                          className="institution-card-responsavel-photo"
+                          className={styles["institution-card-responsavel-photo"]}
                         />
                       ) : (
-                        <div className="institution-card-responsavel-placeholder">Sem foto</div>
+                        <div className={styles["institution-card-responsavel-placeholder"]}>Sem foto</div>
                       )}
                     </div>
                     <p><strong>Tipo:</strong> {tipoLabel(item.tipo)}</p>
                     <p><strong>Descrição:</strong> {item.descricao || "-"}</p>
-                    <div className="institution-card-address-row">
+                    <div className={styles["institution-card-address-row"]}>
                       <p><strong>Endereço:</strong> {item.endereco || "-"}</p>
                       <button
                         type="button"
-                        className="institution-card-route-btn"
+                        className={styles["institution-card-route-btn"]}
                         onClick={() => handleRouteToPoint(item)}
                         aria-label={`Traçar rota para ${item.nome}`}
                         title="Traçar rota"
@@ -262,7 +263,7 @@ export function PontosInstitucionaisCardsScreen({ onRouteToPoint }: PontosInstit
                     {/* <p><strong>Coordenadas:</strong> {Number.isFinite(item.latitude) ? item.latitude.toFixed(5) : "-"}, {Number.isFinite(item.longitude) ? item.longitude.toFixed(5) : "-"}</p> */}
                     <button
                       type="button"
-                      className="institution-card-flip-btn"
+                      className={styles["institution-card-flip-btn"]}
                       onClick={() => setFlippedCardId(null)}
                       aria-label={`Voltar para frente do card ${item.nome}`}
                     >
