@@ -1,0 +1,103 @@
+/* Estilos especificos do TelefonesUteisCardsScreen. CSS Module: cada classe
+   recebe um sufixo hash em build (ex: phoneCard_abc123) - garante isolamento
+   de escopo sem precisar nomenclatura BEM rigida. Importar via:
+       import styles from "./TelefonesUteisCardsScreen.module.css";
+   E referenciar com bracket notation (classes com hifen): styles["phone-card"]. */
+
+.phone-groups {
+  display: grid;
+  gap: 14px;
+}
+
+.phone-group {
+  display: grid;
+  gap: 10px;
+}
+
+.phone-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid #cfe0f5;
+  border-radius: 10px;
+  background: #f8fbff;
+}
+
+.phone-group-header h3 {
+  margin: 0;
+  font-size: 0.92rem;
+  color: #102f58;
+}
+
+.phone-group-header span {
+  font-size: 0.78rem;
+  color: #476788;
+}
+
+.phone-cards-grid {
+  grid-template-columns: repeat(auto-fill, minmax(clamp(190px, 22vw, 240px), 1fr));
+}
+
+.phone-card {
+  border: 1px solid #8da8ca;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 6px 14px rgba(30, 58, 98, 0.12);
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.phone-card-badge {
+  width: fit-content;
+  border-radius: 999px;
+  padding: 5px 10px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: #f8fafc;
+  background: #1d4f84;
+}
+
+.phone-card h4 {
+  margin: 0;
+  font-size: 0.96rem;
+  color: #0f172a;
+}
+
+.phone-card-caption {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #475569;
+  min-height: 2.5em;
+}
+
+.phone-card-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #bfd3ef;
+  color: #0f766e;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.phone-card-link:hover {
+  background: #eef6ff;
+}
+
+.phone-card-emergency .phone-card-badge {
+  background: #b91c1c;
+}
+
+.phone-card-mobility .phone-card-badge {
+  background: #1d4ed8;
+}
+
+.phone-card-hospitality .phone-card-badge {
+  background: #7c3aed;
+}

@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
+import styles from "./TelefonesUteisCardsScreen.module.css";
 
 type TelefoneUtilCardItem = {
   id: string;
@@ -48,18 +49,19 @@ function categoriaOrder(categoria: string) {
 }
 
 function categoriaCardClass(categoria: string) {
+  const base = styles["phone-card"];
   switch (normalizeCategoria(categoria)) {
     case "emergenciaservicospublicos":
     case "emergencia_servicos_publicos":
-      return "phone-card phone-card-emergency";
+      return `${base} ${styles["phone-card-emergency"]}`;
     case "transportecultura":
     case "transporte_cultura":
-      return "phone-card phone-card-mobility";
+      return `${base} ${styles["phone-card-mobility"]}`;
     case "hoteispousadas":
     case "hoteis_pousadas":
-      return "phone-card phone-card-hospitality";
+      return `${base} ${styles["phone-card-hospitality"]}`;
     default:
-      return "phone-card";
+      return base;
   }
 }
 
@@ -172,21 +174,21 @@ export function TelefonesUteisCardsScreen() {
         </div>
       )}
 
-      <div className="phone-groups">
+      <div className={styles["phone-groups"]}>
         {groupedTelefones.map(([categoria, itens]) => (
-          <section key={categoria} className="phone-group">
-            <header className="phone-group-header">
+          <section key={categoria} className={styles["phone-group"]}>
+            <header className={styles["phone-group-header"]}>
               <h3>{categoria}</h3>
               <span>{itens.length} contatos</span>
             </header>
 
-            <div className="cards-grid phone-cards-grid">
+            <div className={`cards-grid ${styles["phone-cards-grid"]}`}>
               {itens.map((item) => (
                 <article key={item.id} className={categoriaCardClass(item.categoria)}>
-                  <span className="phone-card-badge">{categoria}</span>
+                  <span className={styles["phone-card-badge"]}>{categoria}</span>
                   <h4>{item.nome}</h4>
-                  <p className="phone-card-caption">Contato telefônico disponível para atendimento rápido.</p>
-                  <a className="phone-card-link" href={`tel:${normalizePhoneHref(item.telefone)}`}>
+                  <p className={styles["phone-card-caption"]}>Contato telefônico disponível para atendimento rápido.</p>
+                  <a className={styles["phone-card-link"]} href={`tel:${normalizePhoneHref(item.telefone)}`}>
                     {item.telefone}
                   </a>
                 </article>
