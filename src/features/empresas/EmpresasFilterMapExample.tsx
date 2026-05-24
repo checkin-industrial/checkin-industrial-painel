@@ -11,6 +11,9 @@ import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { createEmpresaMarkerIcon } from "./EmpresaMarker";
 import { useDraggable } from "../../shared/hooks/useDraggable";
 import { MapContext, type MapContextValue } from "./MapContext";
+import { useFiltrosEmpresas, INITIAL_PONTO_FILTERS } from "./hooks/useFiltrosEmpresas";
+import { useUserLocation } from "./hooks/useUserLocation";
+import { useRouteOSRM } from "./hooks/useRouteOSRM";
 import { FilterPanel } from "./components/FilterPanel";
 import { NeighborhoodReportPanel } from "./components/NeighborhoodReportPanel";
 import { MapLegend } from "./components/MapLegend";
@@ -60,20 +63,6 @@ const CLUSTER_THRESHOLD = 200;
 // components/FilterPanel.tsx - sao usadas apenas la.
 
 // DEFAULT_CENTER, DEFAULT_ZOOM, MAP_BOUNDS movidos pra ./MapHelpers.tsx - re-importados acima.
-
-const INITIAL_FILTERS: FilterFormState = {
-  nomeFantasia: "",
-  setor: "",
-  porte: "",
-  cnae: "",
-  municipio: "",
-  situacao: "",
-};
-
-const INITIAL_PONTO_FILTERS: PontoInstitucionalFilterState = {
-  termo: "",
-  tipo: "",
-};
 
 const INITIAL_LAYER_TOGGLES: LayerToggleState = {
   heatmap: false,
@@ -164,8 +153,23 @@ function matchesPontoInstitucionalFilters(
 }
 
 export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }: EmpresasFilterMapExampleProps) {
-  const [filters, setFilters] = useState<FilterFormState>(INITIAL_FILTERS);
-  const [pontoFilters, setPontoFilters] = useState<PontoInstitucionalFilterState>(INITIAL_PONTO_FILTERS);
+  const {
+    filters,
+    setFilters,
+    pontoFilters,
+    setPontoFilters,
+    empresaBuscaAtiva,
+    setEmpresaBuscaAtiva,
+    pontosBuscaAtiva,
+    setPontosBuscaAtiva,
+    effectiveFilters,
+    pontosTipoEfetivo,
+    handleFilterChange,
+    handlePontoFilterChange,
+    toggleEmpresaBusca,
+    togglePontosBusca,
+    handleClearFiltros,
+  } = useFiltrosEmpresas();
   const [cnaeOptions, setCnaeOptions] = useState<CnaeOption[]>([{ value: "", label: "Todos" }]);
   const [municipioOptions, setMunicipioOptions] = useState<string[]>([]);
   const [filtersCollapsed, setFiltersCollapsed] = useState(true);
@@ -173,8 +177,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   const [pontosFiltersCollapsed, setPontosFiltersCollapsed] = useState(false);
   const [empresaFiltersVisible, setEmpresaFiltersVisible] = useState(true);
   const [pontosFiltersVisible, setPontosFiltersVisible] = useState(true);
-  const [empresaBuscaAtiva, setEmpresaBuscaAtiva] = useState(true);
-  const [pontosBuscaAtiva, setPontosBuscaAtiva] = useState(true);
   const [reportCollapsed, setReportCollapsed] = useState(false);
   const [panelsVisible, setPanelsVisible] = useState({
     filtros: false,
@@ -184,13 +186,15 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [selectedEmpresaId, setSelectedEmpresaId] = useState<string | null>(null);
   const [selectedPontoInstitucionalId, setSelectedPontoInstitucionalId] = useState<string | null>(null);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
-  const [locationActive, setLocationActive] = useState(false);
+  const {
+    userLocation,
+    setUserLocation,
+    locationActive,
+    setLocationActive,
+    requestUserLocation,
+    toggleUserLocation,
+  } = useUserLocation();
   const [routeEnabled, setRouteEnabled] = useState(false);
-  const [routePath, setRoutePath] = useState<LatLngTuple[]>([]);
-  const [routeLoading, setRouteLoading] = useState(false);
-  const [routeError, setRouteError] = useState<string | null>(null);
-  const [routeInfo, setRouteInfo] = useState<{ distanceKm: number; durationMin: number } | null>(null);
   const [mapFocusTarget, setMapFocusTarget] = useState<LatLngTuple | null>(null);
   const [collapsedReportSections, setCollapsedReportSections] = useState<Record<ReportSectionKey, boolean>>({
     proximas: false,
@@ -199,9 +203,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   });
   const mapStageRef = useRef<HTMLDivElement | null>(null);
   const lastMapTargetRequestRef = useRef<number | null>(null);
-
-  const effectiveFilters = empresaBuscaAtiva ? filters : INITIAL_FILTERS;
-  const pontosTipoEfetivo = pontosBuscaAtiva ? pontoFilters.tipo : "";
 
   const {
     data: empresas = [],
@@ -275,60 +276,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     }
   }, [empresas, effectiveFilters]);
 
-  function requestUserLocation() {
-    if (!navigator.geolocation) {
-      alert("Seu navegador não suporta geolocalização.");
-      return;
-    }
-
-    setLocationActive(true);
-
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        setUserLocation({
-          latitude: position.coords.latitude,
-          longitude: position.coords.longitude,
-        });
-      },
-      (error) => {
-        console.error("Erro ao obter localização:", error);
-        alert("Não foi possível obter sua localização. Verifique as permissões.");
-        setLocationActive(false);
-      },
-      {
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0,
-      }
-    );
-  }
-
-  function toggleUserLocation() {
-    if (locationActive) {
-      setLocationActive(false);
-      setUserLocation(null);
-      setRoutePath([]);
-      setRouteInfo(null);
-    } else {
-      requestUserLocation();
-    }
-  }
-
-  function handleRouteFromReportAddress() {
-    if (!rotaDestino) {
-      setRouteError("Selecione um ponto no mapa para traçar a rota.");
-      setRouteEnabled(false);
-      return;
-    }
-
-    setRouteEnabled(true);
-    setRouteError(null);
-
-    if (!userLocation) {
-      requestUserLocation();
-    }
-  }
-
   useEffect(() => {
     if (selectedEmpresaId && !empresas.some((empresa) => empresa.id === selectedEmpresaId)) {
       setSelectedEmpresaId(null);
@@ -379,7 +326,7 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     setReportCollapsed(false);
     setPanelsVisible((prev) => ({ ...prev, filtros: false, relatorio: true }));
     setMapFocusTarget([mapTargetPoint.latitude, mapTargetPoint.longitude]);
-  }, [mapTargetPoint]);
+  }, [mapTargetPoint, setPontoFilters, setPontosBuscaAtiva]);
 
   const {
     data: vizinhanca = null,
@@ -425,33 +372,13 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   }
 
   function handleClear() {
-    setFilters(INITIAL_FILTERS);
-    setPontoFilters(INITIAL_PONTO_FILTERS);
+    handleClearFiltros();
     setSelectedEmpresaId(null);
     setSelectedPontoInstitucionalId(null);
-    setEmpresaBuscaAtiva(true);
-    setPontosBuscaAtiva(true);
     setEmpresaFiltersVisible(true);
     setPontosFiltersVisible(true);
     setEmpresaFiltersCollapsed(false);
     setPontosFiltersCollapsed(false);
-  }
-
-  function handleFilterChange(field: keyof FilterFormState, value: string) {
-    setFilters((current) => ({ ...current, [field]: value }));
-  }
-
-  function handlePontoFilterChange(field: keyof PontoInstitucionalFilterState, value: string) {
-    setPontoFilters((current) => ({ ...current, [field]: value }));
-  }
-
-  function toggleEmpresaBusca() {
-    setEmpresaBuscaAtiva((prev) => !prev);
-  }
-
-  function togglePontosBusca() {
-    const next = !pontosBuscaAtiva;
-    setPontosBuscaAtiva(next);
   }
 
   const center = useMemo<[number, number]>(() => {
@@ -498,6 +425,37 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     return null;
   }, [empresaSelecionadaNoMapa, pontoInstitucionalSelecionado]);
 
+  const {
+    routePath,
+    setRoutePath,
+    routeLoading,
+    setRouteLoading,
+    routeError,
+    setRouteError,
+    routeInfo,
+    setRouteInfo,
+  } = useRouteOSRM({
+    routeEnabled,
+    userLocation,
+    locationActive,
+    destino: rotaDestino,
+  });
+
+  function handleRouteFromReportAddress() {
+    if (!rotaDestino) {
+      setRouteError("Selecione um ponto no mapa para traçar a rota.");
+      setRouteEnabled(false);
+      return;
+    }
+
+    setRouteEnabled(true);
+    setRouteError(null);
+
+    if (!userLocation) {
+      requestUserLocation();
+    }
+  }
+
   const pontosInstitucionaisFiltrados = useMemo(() => {
     return pontosInstitucionais
       .filter((ponto) => isCoordinateInsideViewportWindow(ponto.latitude, ponto.longitude))
@@ -533,100 +491,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
   }, [empresasProximas]);
 
   const possuiSelecaoNoMapa = Boolean(selectedEmpresaId || selectedPontoInstitucionalId);
-
-  useEffect(() => {
-    if (!routeEnabled) {
-      setRouteLoading(false);
-      setRouteError(null);
-      setRoutePath([]);
-      setRouteInfo(null);
-      return;
-    }
-
-    if (!locationActive || !userLocation) {
-      setRouteLoading(false);
-      setRoutePath([]);
-      setRouteInfo(null);
-      setRouteError("Ative sua localização para calcular a rota.");
-      return;
-    }
-
-    if (!rotaDestino) {
-      setRouteLoading(false);
-      setRoutePath([]);
-      setRouteInfo(null);
-      setRouteError("Selecione um ponto no mapa para traçar a rota.");
-      return;
-    }
-
-    const origemAtual = userLocation;
-    const destinoAtual = rotaDestino;
-
-    if (!origemAtual || !destinoAtual) {
-      setRouteLoading(false);
-      setRoutePath([]);
-      setRouteInfo(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    async function fetchRoute() {
-      setRouteLoading(true);
-      setRouteError(null);
-
-      try {
-        const [origemLat, origemLng] = [origemAtual.latitude, origemAtual.longitude];
-        const [destinoLat, destinoLng] = destinoAtual;
-        const endpoint = `https://router.project-osrm.org/route/v1/driving/${origemLng},${origemLat};${destinoLng},${destinoLat}?overview=full&geometries=geojson&steps=false`;
-        const response = await fetch(endpoint);
-
-        if (!response.ok) {
-          throw new Error(`Falha ao calcular rota (${response.status})`);
-        }
-
-        const data = await response.json() as {
-          routes?: Array<{
-            distance: number;
-            duration: number;
-            geometry: { coordinates: Array<[number, number]> };
-          }>;
-        };
-
-        const route = data.routes?.[0];
-        if (!route?.geometry?.coordinates?.length) {
-          throw new Error("Rota indisponível para o destino selecionado.");
-        }
-
-        if (!cancelled) {
-          const coordinates = route.geometry.coordinates
-            .map(([lng, lat]) => [lat, lng] as LatLngTuple);
-
-          setRoutePath(coordinates);
-          setRouteInfo({
-            distanceKm: route.distance / 1000,
-            durationMin: route.duration / 60,
-          });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setRoutePath([]);
-          setRouteInfo(null);
-          setRouteError(err instanceof Error ? err.message : "Não foi possível calcular a rota.");
-        }
-      } finally {
-        if (!cancelled) {
-          setRouteLoading(false);
-        }
-      }
-    }
-
-    fetchRoute();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [locationActive, routeEnabled, rotaDestino, userLocation]);
 
   const avgDistanceKm = useMemo(() => {
     if (empresasProximas.length === 0) {
@@ -730,11 +594,15 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
       reportLoading,
       reportError,
       filters,
+      setFilters,
       empresaBuscaAtiva,
+      setEmpresaBuscaAtiva,
       cnaeOptions,
       municipioOptions,
       pontoFilters,
+      setPontoFilters,
       pontosBuscaAtiva,
+      setPontosBuscaAtiva,
       selectedEmpresaId,
       selectedPontoInstitucionalId,
       layerToggles,
@@ -747,12 +615,18 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
       pontosFiltersVisible,
       collapsedReportSections,
       userLocation,
+      setUserLocation,
       locationActive,
+      setLocationActive,
       routeEnabled,
       routePath,
+      setRoutePath,
       routeLoading,
+      setRouteLoading,
       routeError,
+      setRouteError,
       routeInfo,
+      setRouteInfo,
       onAdminEditEmpresa,
     ],
   );
