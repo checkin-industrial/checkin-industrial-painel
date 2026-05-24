@@ -10,6 +10,7 @@ import {
 } from "../../pontosInstitucionais/markerHelpers";
 import { useMapContext } from "../useMapContext";
 import type { EmpresaVizinha, ReportSectionKey } from "../types";
+import styles from "./NeighborhoodReportPanel.module.css";
 
 // Painel direito de "Relatório de Vizinhança" - mostra info da empresa selecionada
 // (ou ponto institucional) + vizinhos no raio + agrupamentos por CNAE/setor +
@@ -64,10 +65,11 @@ export function NeighborhoodReportPanel({
   const empresasProximas = vizinhanca?.empresasProximas ?? [];
   const exibirBlocosVizinhanca = !selectedPontoInstitucionalId;
 
-  const baseClass = "map-left-sidebar map-left-sidebar--selection map-left-sidebar--animated report-panel map-side-panel map-side-panel--report draggable-panel";
+  // report-panel local; map-left-sidebar*/map-side-panel*/draggable-panel globais.
+  const baseClass = `map-left-sidebar map-left-sidebar--selection map-left-sidebar--animated ${styles["report-panel"]} map-side-panel map-side-panel--report draggable-panel`;
   const asideClassName = [
     baseClass,
-    reportCollapsed ? "collapsed" : null,
+    reportCollapsed ? styles.collapsed : null,
     draggable.isDragging ? "dragging" : null,
   ]
     .filter(Boolean)
@@ -80,7 +82,7 @@ export function NeighborhoodReportPanel({
       className={asideClassName}
     >
       <header
-        className="report-header panel-toggle-header"
+        className={`${styles["report-header"]} panel-toggle-header`}
         onMouseDown={draggable.handleMouseDown}
         style={{ cursor: draggable.isDragging ? "grabbing" : "grab" }}
       >
@@ -110,12 +112,12 @@ export function NeighborhoodReportPanel({
       {!reportCollapsed && (
         <>
           {routeEnabled && (
-            <section className="report-block">
+            <section className={styles["report-block"]}>
               <h4>Rota da sua localização</h4>
-              {routeLoading && <p className="report-empty-state">Calculando trajeto...</p>}
+              {routeLoading && <p className={styles["report-empty-state"]}>Calculando trajeto...</p>}
               {!routeLoading && routeError && <p className="status-error">{routeError}</p>}
               {!routeLoading && !routeError && routeInfo && (
-                <div className="report-company-card">
+                <div className={styles["report-company-card"]}>
                   <span><strong>Distância:</strong> {routeInfo.distanceKm.toFixed(2)} km</span>
                   <span><strong>Tempo estimado:</strong> {routeInfo.durationMin.toFixed(0)} min</span>
                 </div>
@@ -123,14 +125,14 @@ export function NeighborhoodReportPanel({
             </section>
           )}
 
-          <section className="report-block">
+          <section className={styles["report-block"]}>
             <h4>Ponto institucional selecionado</h4>
-            {!selectedPontoInstitucionalId && <p className="report-empty-state">Clique em um ponto institucional para ver detalhes de parceria e contato.</p>}
+            {!selectedPontoInstitucionalId && <p className={styles["report-empty-state"]}>Clique em um ponto institucional para ver detalhes de parceria e contato.</p>}
             {pontoInstitucionalSelecionado && (
-              <div className="report-company-card report-company-card--institutional">
+              <div className={styles["report-company-card"]}>
                 {pontoInstitucionalSelecionado.cardFotoUrl && (
                   <img
-                    className="report-institution-card-image"
+                    className={styles["report-institution-card-image"]}
                     src={staticUrl(pontoInstitucionalSelecionado.cardFotoUrl)}
                     alt={`Imagem de capa de ${pontoInstitucionalSelecionado.nome}`}
                     loading="lazy"
@@ -138,7 +140,7 @@ export function NeighborhoodReportPanel({
                 )}
                 {pontoInstitucionalSelecionado.logoUrl && (
                   <img
-                    className="report-institution-logo"
+                    className={styles["report-institution-logo"]}
                     src={staticUrl(pontoInstitucionalSelecionado.logoUrl)}
                     alt={`Logo de ${pontoInstitucionalSelecionado.nome}`}
                     loading="lazy"
@@ -155,17 +157,17 @@ export function NeighborhoodReportPanel({
                   </span>
                 </span>
                 <span>{pontoInstitucionalSelecionado.descricao}</span>
-                <div className="report-address-row">
+                <div className={styles["report-address-row"]}>
                   <span><strong>Endereço:</strong> {pontoInstitucionalSelecionado.endereco}</span>
                   <button
                     type="button"
-                    className={routeEnabled ? "report-address-route-btn active" : "report-address-route-btn"}
+                    className={routeEnabled ? `${styles["report-address-route-btn"]} ${styles.active}` : styles["report-address-route-btn"]}
                     onClick={onRouteFromAddress}
                     disabled={routeLoading}
                     aria-label={`Traçar rota até ${pontoInstitucionalSelecionado.nome}`}
                     title={routeLoading ? "Calculando rota..." : "Traçar rota até este endereço"}
                   >
-                    <span className="report-route-icon" aria-hidden="true" />
+                    <span className={styles["report-route-icon"]} aria-hidden="true" />
                   </button>
                 </div>
                 <span><strong>Atividades:</strong> {pontoInstitucionalSelecionado.atividadesDisponiveis}</span>
@@ -175,13 +177,13 @@ export function NeighborhoodReportPanel({
                 <span><strong>Email:</strong> {pontoInstitucionalSelecionado.contatoEmail}</span>
                 {pontoInstitucionalSelecionado.responsavelFotoUrl && (
                   <a
-                    className="report-link"
+                    className={styles["report-link"]}
                     href={staticUrl(pontoInstitucionalSelecionado.responsavelFotoUrl)}
                     target="_blank"
                     rel="noreferrer"
                   >
                     <img
-                      className="report-contact-photo"
+                      className={styles["report-contact-photo"]}
                       src={staticUrl(pontoInstitucionalSelecionado.responsavelFotoUrl)}
                       alt={`Foto de ${pontoInstitucionalSelecionado.contatoNome || "responsável"}`}
                       loading="lazy"
@@ -195,13 +197,13 @@ export function NeighborhoodReportPanel({
 
           {exibirBlocosVizinhanca && (
             <>
-              <section className="report-block">
+              <section className={styles["report-block"]}>
                 <h4>Empresa base</h4>
-                {!selectedEmpresaId && <p className="report-empty-state">Clique em um marcador para analisar a vizinhança em 5 km.</p>}
-                {selectedEmpresaId && reportLoading && <p className="report-empty-state">Carregando vizinhança...</p>}
+                {!selectedEmpresaId && <p className={styles["report-empty-state"]}>Clique em um marcador para analisar a vizinhança em 5 km.</p>}
+                {selectedEmpresaId && reportLoading && <p className={styles["report-empty-state"]}>Carregando vizinhança...</p>}
                 {selectedEmpresaId && reportError && <p className="status-error">{reportError}</p>}
                 {!reportLoading && !reportError && vizinhanca?.empresaBase && (
-                  <div className="report-company-card">
+                  <div className={styles["report-company-card"]}>
                     <strong>{vizinhanca.empresaBase.nomeFantasia}</strong>
                     <span>CNAE: {vizinhanca.empresaBase.cnaePrincipal}</span>
                     <span>Setor: {vizinhanca.empresaBase.setor}</span>
@@ -220,12 +222,12 @@ export function NeighborhoodReportPanel({
                 )}
               </section>
 
-              <section className="report-block">
-                <div className="report-section-header">
+              <section className={styles["report-block"]}>
+                <div className={styles["report-section-header"]}>
                   <h4>Empresas proximas ({empresasProximas.length})</h4>
                   <button
                     type="button"
-                    className="report-section-toggle"
+                    className={styles["report-section-toggle"]}
                     onClick={() => onToggleReportSection("proximas")}
                     aria-expanded={!collapsedReportSections.proximas}
                     aria-label={collapsedReportSections.proximas ? "Expandir empresas proximas" : "Colapsar empresas proximas"}
@@ -234,7 +236,7 @@ export function NeighborhoodReportPanel({
                   </button>
                 </div>
                 {!collapsedReportSections.proximas && (
-                  <ol className="report-list">
+                  <ol className={styles["report-list"]}>
                     {!reportLoading && !reportError && empresasProximas.map((empresa) => (
                       <li key={empresa.id}>
                         <strong>{empresa.nomeFantasia}</strong>
@@ -249,12 +251,12 @@ export function NeighborhoodReportPanel({
                 )}
               </section>
 
-              <section className="report-block">
-                <div className="report-section-header">
+              <section className={styles["report-block"]}>
+                <div className={styles["report-section-header"]}>
                   <h4>Mesmo CNAE ({empresasMesmoCnae.length})</h4>
                   <button
                     type="button"
-                    className="report-section-toggle"
+                    className={styles["report-section-toggle"]}
                     onClick={() => onToggleReportSection("cnae")}
                     aria-expanded={!collapsedReportSections.cnae}
                     aria-label={collapsedReportSections.cnae ? "Expandir empresas do mesmo CNAE" : "Colapsar empresas do mesmo CNAE"}
@@ -263,7 +265,7 @@ export function NeighborhoodReportPanel({
                   </button>
                 </div>
                 {!collapsedReportSections.cnae && (
-                  <ol className="report-list">
+                  <ol className={styles["report-list"]}>
                     {!reportLoading && !reportError && empresasMesmoCnae.map((empresa) => (
                       <li key={empresa.id}>{empresa.nomeFantasia}: {(empresa.distanciaMetros / 1000).toFixed(2)} km</li>
                     ))}
@@ -272,12 +274,12 @@ export function NeighborhoodReportPanel({
                 )}
               </section>
 
-              <section className="report-block">
-                <div className="report-section-header">
+              <section className={styles["report-block"]}>
+                <div className={styles["report-section-header"]}>
                   <h4>Mesmo setor ({empresasMesmoSetor.length})</h4>
                   <button
                     type="button"
-                    className="report-section-toggle"
+                    className={styles["report-section-toggle"]}
                     onClick={() => onToggleReportSection("setor")}
                     aria-expanded={!collapsedReportSections.setor}
                     aria-label={collapsedReportSections.setor ? "Expandir empresas do mesmo setor" : "Colapsar empresas do mesmo setor"}
@@ -286,7 +288,7 @@ export function NeighborhoodReportPanel({
                   </button>
                 </div>
                 {!collapsedReportSections.setor && (
-                  <ol className="report-list">
+                  <ol className={styles["report-list"]}>
                     {!reportLoading && !reportError && empresasMesmoSetor.map((empresa) => (
                       <li key={empresa.id}>{empresa.nomeFantasia}: {(empresa.distanciaMetros / 1000).toFixed(2)} km</li>
                     ))}
@@ -295,7 +297,7 @@ export function NeighborhoodReportPanel({
                 )}
               </section>
 
-              <div className="report-metrics">
+              <div className={styles["report-metrics"]}>
                 <div>
                   <span>Distância média</span>
                   <strong>{avgDistanceKm.toFixed(1)} km</strong>
