@@ -173,8 +173,6 @@ App em <http://localhost:5173>.
 
 ## TODOs / Debito tecnico
 
-- **Decompor `EmpresasFilterMapExample.tsx` (1914 linhas)**: o componente do mapa principal acumulou mapa + filtros + popup + rota + sub-mapa de vizinhanca. Quebrar em sub-componentes (FilterPanel, EmpresaPopup, NeighborhoodOverlay, RouteOverlay) facilita manutencao por IA. Quando fizer, mover sub-componentes pra `features/empresas/components/`.
-- **CSS Modules por feature**: o `styles.css` global tem 2890 linhas. Migrar regras pra `<Componente>.module.css` ao lado de cada componente. Comecar pelas features menores.
-- **Migrar fetches manuais pra TanStack Query**: hoje cada componente faz `useEffect + fetch + useState`. Migrar pra `useQuery` reduz boilerplate e ganha cache/dedup. Migrar feature por feature.
-- **ESLint warnings**: 8 warnings hoje (react-hooks/exhaustive-deps, react-refresh). Reduzir e ligar `--max-warnings 0` no CI.
-- **Cobertura de teste expandir**: hoje so o `apiClient.ts` tem testes (10 testes). Adicionar smoke tests por feature (renderiza, click navega, etc).
+- **Cobertura de teste expandir**: cobertura cresceu (~48 tests) mas ainda falta cobrir os sub-componentes admin extraidos (EmpresasTable, EmpresaFormModal, EmpresasListToolbar).
+- **Decompor `PontosInstitucionaisManagementScreen.tsx` (~986 linhas)**: mesma estrategia ja aplicada em EmpresasManagementScreen — extrair sub-componentes (ListToolbar/Table/FormModal) + hooks.
+- **`useRouteOSRM` -> useQuery**: hoje o hook usa `fetch` + `useEffect` manual com cancellation. Migrar pra useQuery daria cache de rotas + cancellation automatica via signal.

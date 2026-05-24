@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { MapContainer, TileLayer } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import { EmpresaMarker, type EmpresaMapItem } from "./EmpresaMarker";
@@ -19,45 +20,23 @@ export function EmpresasMap({
   initialCenter = DEFAULT_CENTER,
   initialZoom = DEFAULT_ZOOM,
 }: EmpresasMapProps) {
-  const [empresas, setEmpresas] = useState<EmpresaMapItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    let isMounted = true;
-
-    async function carregarEmpresas() {
-      try {
-        setLoading(true);
-        setError(null);
-
-        const response = await fetch(`${apiBaseUrl}/api/empresas`);
-        if (!response.ok) {
-          throw new Error(`Falha ao carregar empresas (${response.status})`);
-        }
-
-        const data: EmpresaMapItem[] = await response.json();
-
-        if (isMounted) {
-          setEmpresas(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err instanceof Error ? err.message : "Erro desconhecido ao carregar mapa.");
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
+  const {
+    data: empresas = [],
+    isLoading: loading,
+    error: queryError,
+  } = useQuery({
+    queryKey: ["empresas", "map-simple", apiBaseUrl],
+    queryFn: async () => {
+      const response = await fetch(`${apiBaseUrl}/api/empresas`);
+      if (!response.ok) {
+        throw new Error(`Falha ao carregar empresas (${response.status})`);
       }
-    }
+      const data = (await response.json()) as EmpresaMapItem[];
+      return Array.isArray(data) ? data : [];
+    },
+  });
 
-    carregarEmpresas();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [apiBaseUrl]);
+  const error = queryError instanceof Error ? queryError.message : null;
 
   const center = useMemo<[number, number]>(() => {
     if (empresas.length === 0) {
