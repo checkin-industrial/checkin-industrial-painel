@@ -1,14 +1,54 @@
-import { useEffect, useRef, useState } from "react";
-import { EmpresasFilterMapExample } from "./features/empresas/EmpresasFilterMapExample";
-import { EmpresasManagementScreen } from "./features/empresas/EmpresasManagementScreen";
-import { GoogleMapsImportScreen } from "./features/empresas/GoogleMapsImportScreen";
-import { PontosInstitucionaisManagementScreen } from "./features/pontosInstitucionais/PontosInstitucionaisManagementScreen";
-import { PontosInstitucionaisCardsScreen } from "./features/pontosInstitucionais/PontosInstitucionaisCardsScreen";
-import { TelefonesUteisCardsScreen } from "./features/telefonesUteis/TelefonesUteisCardsScreen";
-import { TelefonesUteisManagementScreen } from "./features/telefonesUteis/TelefonesUteisManagementScreen";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useAuth } from "./shared/auth/AuthContext";
 import { LoginModal } from "./shared/auth/LoginModal";
 import logo from "./imagens/logo.png";
+
+// Code-splitting: cada tela "pesada" vira um chunk separado, carregado sob
+// demanda quando o usuario navega para a tab correspondente. Quebra o bundle
+// principal (era 536kB) em chunks por feature, reduzindo o tempo ate o primeiro
+// render no mapa publico (default tab).
+//
+// Componentes leves (LoginModal, etc.) permanecem eager: ja sao usados na
+// inicializacao ou tem footprint pequeno demais para justificar um chunk.
+const EmpresasFilterMapExample = lazy(() =>
+  import("./features/empresas/EmpresasFilterMapExample").then((mod) => ({
+    default: mod.EmpresasFilterMapExample,
+  })),
+);
+const EmpresasManagementScreen = lazy(() =>
+  import("./features/empresas/EmpresasManagementScreen").then((mod) => ({
+    default: mod.EmpresasManagementScreen,
+  })),
+);
+const GoogleMapsImportScreen = lazy(() =>
+  import("./features/empresas/GoogleMapsImportScreen").then((mod) => ({
+    default: mod.GoogleMapsImportScreen,
+  })),
+);
+const PontosInstitucionaisManagementScreen = lazy(() =>
+  import("./features/pontosInstitucionais/PontosInstitucionaisManagementScreen").then((mod) => ({
+    default: mod.PontosInstitucionaisManagementScreen,
+  })),
+);
+const PontosInstitucionaisCardsScreen = lazy(() =>
+  import("./features/pontosInstitucionais/PontosInstitucionaisCardsScreen").then((mod) => ({
+    default: mod.PontosInstitucionaisCardsScreen,
+  })),
+);
+const TelefonesUteisCardsScreen = lazy(() =>
+  import("./features/telefonesUteis/TelefonesUteisCardsScreen").then((mod) => ({
+    default: mod.TelefonesUteisCardsScreen,
+  })),
+);
+const TelefonesUteisManagementScreen = lazy(() =>
+  import("./features/telefonesUteis/TelefonesUteisManagementScreen").then((mod) => ({
+    default: mod.TelefonesUteisManagementScreen,
+  })),
+);
+
+function TabFallback() {
+  return <div className="page-loading">Carregando…</div>;
+}
 
 type DashboardTab = "mapa" | "gestao" | "gestao-pontos" | "cards-pontos" | "cards-telefones" | "gestao-telefones" | "import-google-maps";
 
@@ -231,23 +271,25 @@ export function App() {
       </header>
 
       <main className={activeTab === "mapa" ? "page page-map" : "page"}>
-        {activeTab === "mapa" && (
-          <EmpresasFilterMapExample
-            mapTargetPoint={mapTargetPoint}
-            onAdminEditEmpresa={handleAdminEditEmpresaFromMap}
-          />
-        )}
-        {activeTab === "gestao" && (
-          <EmpresasManagementScreen
-            pendingEditId={pendingEditEmpresaId}
-            onEditConsumed={() => setPendingEditEmpresaId(null)}
-          />
-        )}
-        {activeTab === "gestao-pontos" && <PontosInstitucionaisManagementScreen />}
-        {activeTab === "cards-pontos" && <PontosInstitucionaisCardsScreen onRouteToPoint={handleRouteToPointFromCards} />}
-        {activeTab === "cards-telefones" && <TelefonesUteisCardsScreen />}
-        {activeTab === "gestao-telefones" && <TelefonesUteisManagementScreen />}
-        {activeTab === "import-google-maps" && <GoogleMapsImportScreen onGoToManagement={() => setActiveTab("gestao")} />}
+        <Suspense fallback={<TabFallback />}>
+          {activeTab === "mapa" && (
+            <EmpresasFilterMapExample
+              mapTargetPoint={mapTargetPoint}
+              onAdminEditEmpresa={handleAdminEditEmpresaFromMap}
+            />
+          )}
+          {activeTab === "gestao" && (
+            <EmpresasManagementScreen
+              pendingEditId={pendingEditEmpresaId}
+              onEditConsumed={() => setPendingEditEmpresaId(null)}
+            />
+          )}
+          {activeTab === "gestao-pontos" && <PontosInstitucionaisManagementScreen />}
+          {activeTab === "cards-pontos" && <PontosInstitucionaisCardsScreen onRouteToPoint={handleRouteToPointFromCards} />}
+          {activeTab === "cards-telefones" && <TelefonesUteisCardsScreen />}
+          {activeTab === "gestao-telefones" && <TelefonesUteisManagementScreen />}
+          {activeTab === "import-google-maps" && <GoogleMapsImportScreen onGoToManagement={() => setActiveTab("gestao")} />}
+        </Suspense>
       </main>
 
       <LoginModal

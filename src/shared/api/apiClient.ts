@@ -103,15 +103,31 @@ export async function apiFetch<T = unknown>(
     throw new ApiError(message, response.status, body);
   }
 
+  return parseResponse<T>(response);
+}
+
+/**
+ * Decodifica a resposta conforme o Content-Type:
+ * - 204 No Content -> undefined (caller deve declarar `apiFetch<void>` ou ignorar o retorno).
+ * - application/json -> JSON parseado.
+ * - Qualquer outro -> texto cru.
+ *
+ * O tipo de retorno e' inferido pelo caller (`apiFetch<T>`); este helper centraliza o
+ * unico ponto onde o `unknown` vindo do runtime e' aceito como T, evitando casts
+ * espalhados (`as unknown as T`) no caminho principal do apiFetch.
+ */
+async function parseResponse<T>(response: Response): Promise<T> {
   if (response.status === 204) {
     return undefined as T;
   }
 
   const contentType = response.headers.get("content-type") ?? "";
   if (contentType.includes("application/json")) {
-    return (await response.json()) as T;
+    const json: unknown = await response.json();
+    return json as T;
   }
-  return (await response.text()) as unknown as T;
+  const text: unknown = await response.text();
+  return text as T;
 }
 
 function extractMessageFromBody(body: unknown): string | null {

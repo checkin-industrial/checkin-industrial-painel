@@ -85,6 +85,7 @@ export function PontoInstitucionalFormModal({
                   onChange={(event) =>
                     setFormData((prev) => ({ ...prev, corMarcador: event.target.value }))
                   }
+                  aria-label="Seletor de cor do marcador"
                 />
                 <input
                   type="text"
@@ -94,6 +95,7 @@ export function PontoInstitucionalFormModal({
                   }
                   maxLength={20}
                   required
+                  aria-label="Cor do marcador em hexadecimal"
                 />
               </div>
             </label>
