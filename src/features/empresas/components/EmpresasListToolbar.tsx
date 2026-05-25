@@ -29,6 +29,7 @@ export function EmpresasListToolbar({
         value={searchTerm}
         onChange={(event) => onSearchTermChange(event.target.value)}
         placeholder="Buscar por nome, CNAE, município, telefone ou CEP"
+        aria-label="Buscar empresas por nome, CNAE, município, telefone ou CEP"
       />
       <select
         value={statusFiltro}

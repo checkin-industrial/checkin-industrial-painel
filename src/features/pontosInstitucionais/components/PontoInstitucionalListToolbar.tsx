@@ -39,10 +39,12 @@ export function PontoInstitucionalListToolbar({
         value={searchTerm}
         onChange={(event) => onSearchTermChange(event.target.value)}
         placeholder="Buscar por nome, tipo, endereço ou contato"
+        aria-label="Buscar pontos por nome, tipo, endereço ou contato"
       />
       <select
         value={statusFiltro}
         onChange={(event) => onStatusFiltroChange(event.target.value as StatusFiltroPonto)}
+        aria-label="Filtro de status"
       >
         <option value="ativos">Somente ativos</option>
         <option value="inativos">Somente inativos</option>

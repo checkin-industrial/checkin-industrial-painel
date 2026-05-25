@@ -22,12 +22,12 @@ checkin-industrial-painel/
 │   └── CODEOWNERS
 ├── public/                      # assets estaticos servidos como-esta (favicon, manifest, sw.js)
 ├── src/
-│   ├── App.tsx                  # shell + roteamento por tab (useState)
+│   ├── App.tsx                  # shell + roteamento por tab (useState) + React.lazy/Suspense
 │   ├── main.tsx                 # entry; cria QueryClient e monta React tree
-│   ├── styles.css               # CSS global (TODO: quebrar em CSS Modules por feature)
+│   ├── styles.css               # CSS global (WIP: migracao incremental pra CSS Modules por feature)
 │   ├── features/
-│   │   ├── empresas/            # mapa industrial + gestao + sub-componentes do mapa
-│   │   ├── pontosInstitucionais/# cards publicos + tela de gestao
+│   │   ├── empresas/            # mapa industrial + gestao + sub-componentes do mapa (decomposto: hooks/ + components/)
+│   │   ├── pontosInstitucionais/# cards publicos + tela de gestao (decomposto: components/)
 │   │   ├── telefonesUteis/      # cards + gestao
 │   │   └── shared/              # componentes UI compartilhados entre features
 │   ├── shared/
@@ -173,6 +173,12 @@ App em <http://localhost:5173>.
 
 ## TODOs / Debito tecnico
 
-- **Cobertura de teste expandir**: cobertura cresceu (~48 tests) mas ainda falta cobrir os sub-componentes admin extraidos (EmpresasTable, EmpresaFormModal, EmpresasListToolbar).
-- **Decompor `PontosInstitucionaisManagementScreen.tsx` (~986 linhas)**: mesma estrategia ja aplicada em EmpresasManagementScreen — extrair sub-componentes (ListToolbar/Table/FormModal) + hooks.
-- **`useRouteOSRM` -> useQuery**: hoje o hook usa `fetch` + `useEffect` manual com cancellation. Migrar pra useQuery daria cache de rotas + cancellation automatica via signal.
+- **CSS Modules por feature (WIP)**: alguns paineis do mapa (FilterPanel, NeighborhoodReportPanel, MapLegend) e a tela de pontos institucionais ja usam `.module.css`. Falta migrar `EmpresasManagementScreen`/`TelefonesUteis*` (que ainda dependem de classes globais em `styles.css`) e o restante das classes utilitarias (`btn-with-icon`, `company-form`, `app-modal-*`, etc.). Estrategia: migrar feature a feature pra evitar PRs gigantes.
+- **Code-splitting de chunks gigantes (WIP)**: `App.tsx` ja faz `React.lazy()` das telas pesadas (mapa, gestao, import). Proximo passo: avaliar split adicional do bundle do mapa (`react-leaflet` + `leaflet.heat` + `leaflet.markercluster`) se ele continuar dominante apos o split por feature.
+
+### Feito (refs historicas)
+
+- `EmpresasFilterMapExample.tsx` decomposto: 1914 -> ~341 linhas. Logica em `features/empresas/hooks/*` (13 hooks) e UI em `features/empresas/components/*`.
+- `PontosInstitucionaisManagementScreen.tsx` decomposto: ~986 -> 467 linhas, sub-componentes em `features/pontosInstitucionais/components/` (ListToolbar/Table/FormModal).
+- Fetches manuais migrados pra TanStack Query (`useQuery` + `invalidateQueries`). `useRouteOSRM` agora usa `useQuery` (cache + cancellation via signal).
+- Cobertura de testes: 170 passing em 34 arquivos (Vitest). Todos os hooks e sub-componentes admin extraidos tem testes.
