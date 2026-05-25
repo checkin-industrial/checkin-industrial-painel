@@ -2,7 +2,11 @@ import { FormEvent, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "../../shared/api/apiClient";
 
+// "sem-filtro" deve aparecer primeiro: e o opt-out do filtro de tipo, util pra
+// explorar uma regiao sem pre-filtrar. Mapeia pra request sem includedTypes na
+// Places API (New). "industria" mapeia internamente pra "manufacturer" (api#22).
 const TIPOS_SUPORTADOS = [
+  { value: "sem-filtro", label: "Todos os tipos" },
   { value: "industria", label: "Indústria" },
   { value: "loja", label: "Loja" },
   { value: "supermercado", label: "Supermercado" },
