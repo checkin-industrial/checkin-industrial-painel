@@ -9,12 +9,14 @@
  *   de build (ex: `VITE_API_BASE=https://api.exemplo.com npm run build`).
  *
  * Autorizacao admin:
- * Endpoints de escrita (POST/PUT/DELETE/PATCH) recebem o header `X-Api-Key`
- * automaticamente. A chave vem do sessionStorage (gerenciada por `AuthContext`).
- * Sem chave logada, escritas retornam 401 e o evento `auth:unauthorized` e
- * disparado para o AuthProvider reabrir o login.
+ * A regra eh **por endpoint, nao por verbo HTTP**:
+ * - apiFetch: injeta `X-Api-Key` automaticamente em writes (POST/PUT/DELETE/PATCH).
+ *   Reads via apiFetch sao tipicamente publicos (mapa, cards, listagens).
+ * - apiFetchBlob: SEMPRE injeta `X-Api-Key`, mesmo em GET, porque os endpoints
+ *   de download (ex: `/api/import/<entidade>/exportar`) sao admin-only.
  *
- * Reads (GET) sao publicos e nao precisam de chave.
+ * A chave vem do sessionStorage (gerenciada por `AuthContext`). Em 401, o
+ * evento `auth:unauthorized` e disparado para o AuthProvider reabrir o login.
  */
 import { getStoredApiKey, notifyUnauthorized } from "../auth/AuthContext";
 
@@ -43,6 +45,69 @@ type ApiFetchOptions = Omit<RequestInit, "body"> & {
 };
 
 /**
+ * Serializa o body de uma chamada apiFetch/apiFetchBlob:
+ * - null/undefined -> nao envia body
+ * - FormData/Blob/string -> envia como-esta (caller controla Content-Type)
+ * - object -> JSON encode + Content-Type application/json
+ *
+ * Mutaviva o Headers passado (set Content-Type quando aplicavel) — design
+ * deliberado pra evitar copia desnecessaria.
+ */
+function serializeBody(body: BodyInit | object | null | undefined, headers: Headers): BodyInit | undefined {
+  if (body == null) return undefined;
+  if (body instanceof FormData || body instanceof Blob || typeof body === "string") return body;
+  headers.set("Content-Type", "application/json");
+  return JSON.stringify(body);
+}
+
+/**
+ * Le o body de uma resposta !ok e lanca ApiError preservando a mensagem
+ * da API (RFC 7807 `detail`/`title` ou convencoes legadas `message`/`erro`).
+ * Compartilhado entre apiFetch e apiFetchBlob — qualquer mudanca de
+ * convencao de erro fica em um ponto so.
+ */
+async function throwApiError(response: Response, method: string, path: string): Promise<never> {
+  let errorBody: unknown = null;
+  const errorContentType = response.headers.get("content-type") ?? "";
+  try {
+    errorBody = errorContentType.includes("application/json") || errorContentType.includes("problem+json")
+      ? await response.json()
+      : await response.text();
+  } catch {
+    // body fica null se nao for parseable
+  }
+  const bodyMessage = extractMessageFromBody(errorBody);
+  const message = bodyMessage ?? `HTTP ${response.status} on ${method} ${path}`;
+  throw new ApiError(message, response.status, errorBody);
+}
+
+/**
+ * Extrai filename de um header `Content-Disposition`, com suporte basico
+ * a RFC 5987/6266 (`filename*=UTF-8''<percent-encoded>`) e fallback pro
+ * formato simples `filename="..."` ou `filename=...`.
+ *
+ * Retorna null se nenhum dos formatos casar — caller deve usar um fallback.
+ */
+function parseFilenameFromContentDisposition(header: string): string | null {
+  if (!header) return null;
+
+  // RFC 5987: filename*=UTF-8''<percent-encoded>
+  // (preferido quando presente; lida com caracteres nao-ASCII).
+  const extendedMatch = header.match(/filename\*\s*=\s*([^']*)'[^']*'([^;]+)/i);
+  if (extendedMatch?.[2]) {
+    try {
+      return decodeURIComponent(extendedMatch[2].trim());
+    } catch {
+      // percent-encoding invalido: cai pro fallback abaixo
+    }
+  }
+
+  // RFC 6266 padrao: filename="..." ou filename=...
+  const simpleMatch = header.match(/filename\s*=\s*"?([^";]+)"?/i);
+  return simpleMatch?.[1]?.trim() ?? null;
+}
+
+/**
  * Wrapper sobre `fetch` que aplica:
  * - URL base da API
  * - Header `X-Api-Key` se VITE_API_KEY estiver definida (para endpoints de escrita)
@@ -59,16 +124,7 @@ export async function apiFetch<T = unknown>(
 ): Promise<T> {
   const { body, headers: extraHeaders, ...rest } = options;
   const headers = new Headers(extraHeaders);
-
-  let finalBody: BodyInit | null | undefined;
-  if (body == null) {
-    finalBody = undefined;
-  } else if (body instanceof FormData || body instanceof Blob || typeof body === "string") {
-    finalBody = body;
-  } else {
-    headers.set("Content-Type", "application/json");
-    finalBody = JSON.stringify(body);
-  }
+  const finalBody = serializeBody(body, headers);
 
   if (method !== "GET" && method !== "HEAD") {
     const sessionKey = getStoredApiKey();
@@ -86,21 +142,7 @@ export async function apiFetch<T = unknown>(
   }
 
   if (!response.ok) {
-    // Le o body (JSON ou texto) pra preservar a mensagem da API.
-    // Convencoes da API: ProblemDetails (RFC 7807) usa `detail`, controllers legados `message`/`erro`.
-    let body: unknown = null;
-    const errorContentType = response.headers.get("content-type") ?? "";
-    try {
-      body = errorContentType.includes("application/json") || errorContentType.includes("problem+json")
-        ? await response.json()
-        : await response.text();
-    } catch {
-      // body fica null se nao for parseable
-    }
-
-    const bodyMessage = extractMessageFromBody(body);
-    const message = bodyMessage ?? `HTTP ${response.status} on ${method} ${path}`;
-    throw new ApiError(message, response.status, body);
+    await throwApiError(response, method, path);
   }
 
   return parseResponse<T>(response);
@@ -138,6 +180,51 @@ function extractMessageFromBody(body: unknown): string | null {
   if (typeof obj.detail === "string") return obj.detail;
   if (typeof obj.title === "string") return obj.title;
   return null;
+}
+
+/**
+ * Variante do apiFetch para endpoints binarios (ex.: download de CSV/PDF/imagem).
+ *
+ * Diferencas vs. apiFetch:
+ * - Retorna { blob, filename } em vez de tipo generico T.
+ * - SEMPRE injeta X-Api-Key se disponivel (mesmo em GET) — necessario para
+ *   downloads protegidos como `/api/import/<entidade>/exportar` que sao
+ *   admin-only.
+ * - Filename extraido do header `Content-Disposition` (RFC 6266/5987 — suporta
+ *   tanto `filename="..."` quanto `filename*=UTF-8''<encoded>`). Se ausente,
+ *   retorna null e caller deve usar um fallback proprio.
+ *
+ * Compartilha helpers internos com apiFetch (serializeBody, throwApiError) pra
+ * evitar divergencia silenciosa entre os dois caminhos.
+ */
+export async function apiFetchBlob(
+  method: "GET" | "POST",
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const { body, headers: extraHeaders, ...rest } = options;
+  const headers = new Headers(extraHeaders);
+  const finalBody = serializeBody(body, headers);
+
+  const sessionKey = getStoredApiKey();
+  if (sessionKey) {
+    headers.set("X-Api-Key", sessionKey);
+  }
+
+  const response = await fetch(apiUrl(path), { method, headers, body: finalBody, ...rest });
+
+  if (response.status === 401) {
+    notifyUnauthorized();
+  }
+
+  if (!response.ok) {
+    await throwApiError(response, method, path);
+  }
+
+  const blob = await response.blob();
+  const filename = parseFilenameFromContentDisposition(response.headers.get("content-disposition") ?? "");
+
+  return { blob, filename };
 }
 
 /**
