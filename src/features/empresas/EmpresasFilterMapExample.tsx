@@ -1,6 +1,4 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { apiFetch } from "../../shared/api/apiClient";
 // `leaflet.heat` e `leaflet.markercluster` se acoplam na global `L` exposta pelo
 // pacote `leaflet`. O `import "leaflet"` precisa rodar ANTES dos plugins pra
 // que `window.L` exista no momento do `leaflet.heat` registrar `L.heatLayer`.
@@ -21,6 +19,8 @@ import { useCnaeMunicipioOptions } from "./hooks/useCnaeMunicipioOptions";
 import { useEmpresaMapSelectionEffects } from "./hooks/useEmpresaMapSelectionEffects";
 import { useMapDerivedSelection } from "./hooks/useMapDerivedSelection";
 import { useMapContextValue } from "./hooks/useMapContextValue";
+import { usePanelVisibility } from "./hooks/usePanelVisibility";
+import { useEmpresaVizinhanca } from "./hooks/useEmpresaVizinhanca";
 import { FilterPanel } from "./components/FilterPanel";
 import { NeighborhoodReportPanel } from "./components/NeighborhoodReportPanel";
 import { MapLegend } from "./components/MapLegend";
@@ -30,7 +30,6 @@ import type { LatLngTuple } from "./MapHelpers";
 // Types movidos pra ./types.ts (compartilhados com sub-componentes).
 // MapHelpers.tsx mantem LeafletHeatLayer, HeatmapPointTuple, LatLngTuple.
 import type {
-  EmpresaVizinhancaResponse,
   MapTargetPoint,
   ReportSectionKey,
   LayerToggleState,
@@ -84,16 +83,24 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     togglePontosBusca,
     handleClearFiltros,
   } = useFiltrosEmpresas();
-  const [filtersCollapsed, setFiltersCollapsed] = useState(true);
-  const [empresaFiltersCollapsed, setEmpresaFiltersCollapsed] = useState(false);
-  const [pontosFiltersCollapsed, setPontosFiltersCollapsed] = useState(false);
-  const [empresaFiltersVisible, setEmpresaFiltersVisible] = useState(true);
-  const [pontosFiltersVisible, setPontosFiltersVisible] = useState(true);
-  const [reportCollapsed, setReportCollapsed] = useState(false);
-  const [panelsVisible, setPanelsVisible] = useState({
-    filtros: false,
-    relatorio: true,
-  });
+  const {
+    filtersCollapsed,
+    setFiltersCollapsed,
+    empresaFiltersCollapsed,
+    setEmpresaFiltersCollapsed,
+    pontosFiltersCollapsed,
+    setPontosFiltersCollapsed,
+    empresaFiltersVisible,
+    setEmpresaFiltersVisible,
+    pontosFiltersVisible,
+    setPontosFiltersVisible,
+    reportCollapsed,
+    setReportCollapsed,
+    panelsVisible,
+    setPanelsVisible,
+    toggleFiltersPanel,
+    resetFiltersBoxes,
+  } = usePanelVisibility();
   const [layerToggles, setLayerToggles] = useState<LayerToggleState>(INITIAL_LAYER_TOGGLES);
   const { mapStageRef, isMapFullscreen, handleToggleFullscreen } = useMapFullscreen();
   const [selectedEmpresaId, setSelectedEmpresaId] = useState<string | null>(null);
@@ -143,33 +150,13 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
     setMapFocusTarget,
   });
 
-  const {
-    data: vizinhanca = null,
-    isFetching: reportLoading,
-    error: vizinhancaQueryError,
-  } = useQuery({
-    queryKey: ["empresas", selectedEmpresaId, "neighbors"],
-    queryFn: () =>
-      apiFetch<EmpresaVizinhancaResponse>(
-        "GET",
-        `/api/empresas/${selectedEmpresaId}/neighbors?radius=5000&limit=20`,
-      ),
-    enabled: !!selectedEmpresaId,
-  });
-
-  const reportError =
-    selectedEmpresaId && vizinhancaQueryError instanceof Error
-      ? vizinhancaQueryError.message
-      : null;
+  const { vizinhanca, reportLoading, reportError } = useEmpresaVizinhanca(selectedEmpresaId);
 
   function handleClear() {
     handleClearFiltros();
     setSelectedEmpresaId(null);
     setSelectedPontoInstitucionalId(null);
-    setEmpresaFiltersVisible(true);
-    setPontosFiltersVisible(true);
-    setEmpresaFiltersCollapsed(false);
-    setPontosFiltersCollapsed(false);
+    resetFiltersBoxes();
   }
 
   const {
@@ -233,17 +220,6 @@ export function EmpresasFilterMapExample({ mapTargetPoint, onAdminEditEmpresa }:
       ...prev,
       [section]: !prev[section],
     }));
-  }
-
-  function toggleFiltersPanel() {
-    setPanelsVisible((prev) => {
-      const nextVisible = !prev.filtros;
-      if (nextVisible) {
-        setFiltersCollapsed(false);
-      }
-
-      return { ...prev, filtros: nextVisible };
-    });
   }
 
   function toggleLayer(layer: keyof LayerToggleState) {
