@@ -150,6 +150,36 @@ describe("apiFetchBlob", () => {
     expect(result.filename).toBeNull();
   });
 
+  // RFC 5987/6266: filename*= e preferido sobre filename= quando ambos
+  // presentes (handling de UTF-8). Defesa em profundidade (Copilot PR #43).
+  it("prefere filename*= (RFC 5987) sobre filename= simples", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response("x", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="ascii-fallback.csv"; filename*=UTF-8''empresas%20com%20acento.csv`,
+        },
+      }),
+    );
+    const result = await apiFetchBlob("GET", "/api/import/empresas/exportar");
+    expect(result.filename).toBe("empresas com acento.csv");
+  });
+
+  it("filename*= com percent-encoding invalido cai pro fallback simples", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response("x", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv",
+          "Content-Disposition": `attachment; filename="ok.csv"; filename*=UTF-8''broken%ZZ`,
+        },
+      }),
+    );
+    const result = await apiFetchBlob("GET", "/api/import/empresas/exportar");
+    expect(result.filename).toBe("ok.csv");
+  });
+
   it("lanca ApiError em 401 (admin nao autenticado)", async () => {
     fetchSpy.mockResolvedValueOnce(new Response("Unauthorized", { status: 401 }));
     await expect(apiFetchBlob("GET", "/api/import/empresas/exportar")).rejects.toMatchObject({

@@ -96,4 +96,20 @@ describe("EmpresasListToolbar (smoke)", () => {
     const btn = screen.getByRole("button", { name: /Importando/i });
     expect(btn).toBeDisabled();
   });
+
+  // Export e import sao independentes (Copilot feedback PR #43): telas podem
+  // expor so um deles sem precisar passar handlers fake do outro.
+
+  it("so onExportCsv renderiza apenas Exportar UTF-8 + ANSI (sem Importar)", () => {
+    setup({ onExportCsv: vi.fn() });
+    expect(screen.getByRole("button", { name: /^Exportar CSV$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Exportar CSV ANSI/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Importar CSV/i })).not.toBeInTheDocument();
+  });
+
+  it("so onImportCsv* renderiza apenas Importar (sem Exportar)", () => {
+    setup({ onImportCsvClick: vi.fn(), onImportCsvFileChange: vi.fn() });
+    expect(screen.queryByRole("button", { name: /Exportar CSV/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Importar CSV/i })).toBeInTheDocument();
+  });
 });

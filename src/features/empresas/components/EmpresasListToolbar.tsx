@@ -36,7 +36,11 @@ export function EmpresasListToolbar({
   fileInputRef,
   importingCsv = false,
 }: EmpresasListToolbarProps) {
-  const csvEnabled = Boolean(onExportCsv && onImportCsvClick && onImportCsvFileChange);
+  // Decoupled: telas podem expor só export, só import, ou ambos. Esta
+  // separacao permite reuso em futuras telas (ex: leitor publico que so
+  // baixa CSV) sem quebrar o contrato atual de Empresas/Pontos.
+  const exportEnabled = Boolean(onExportCsv);
+  const importEnabled = Boolean(onImportCsvClick && onImportCsvFileChange);
 
   return (
     <div className="company-list-toolbar">
@@ -68,7 +72,7 @@ export function EmpresasListToolbar({
       >
         {loadingList ? "Atualizando..." : "Atualizar"}
       </button>
-      {csvEnabled && (
+      {exportEnabled && (
         <>
           <button type="button" className="ghost btn-with-icon" onClick={() => onExportCsv?.(false)}>
             Exportar CSV
@@ -76,6 +80,10 @@ export function EmpresasListToolbar({
           <button type="button" className="ghost btn-with-icon" onClick={() => onExportCsv?.(true)}>
             Exportar CSV ANSI
           </button>
+        </>
+      )}
+      {importEnabled && (
+        <>
           <button
             type="button"
             className="ghost btn-with-icon"
