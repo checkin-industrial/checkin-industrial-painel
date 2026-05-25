@@ -1,6 +1,7 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch } from "../../shared/api/apiClient";
+import { apiFetch, apiFetchBlob } from "../../shared/api/apiClient";
+import { triggerBlobDownload } from "../../shared/utils/downloadBlob";
 import { STATUS } from "./empresaStatus";
 import type {
   EmpresaCreatePayload,
@@ -40,6 +41,8 @@ export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: Empr
   const [editingId, setEditingId] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [geocoding, setGeocoding] = useState(false);
+  const [importingCsv, setImportingCsv] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   const isModalDirty = useMemo(() => {
     if (!isModalOpen) {
@@ -307,6 +310,70 @@ export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: Empr
     }
   }
 
+  async function handleExportCsv(ansi: boolean) {
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const endpoint = ansi
+        ? "/api/import/empresas/exportar-ansi"
+        : "/api/import/empresas/exportar";
+      const { blob, filename } = await apiFetchBlob("GET", endpoint);
+      const fallback = `empresas-${ansi ? "ansi" : "utf8"}.csv`;
+      triggerBlobDownload(blob, filename ?? fallback);
+      setSuccessMessage("Exportacao de empresas concluida.");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao exportar empresas.");
+    }
+  }
+
+  async function handleImportCsvFile(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) {
+      return;
+    }
+
+    setImportingCsv(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      const form = new FormData();
+      form.append("file", file);
+
+      const result = await apiFetch<{
+        totalRecords?: number;
+        inserted?: number;
+        updated?: number;
+        skipped?: number;
+        errors?: Array<{ lineNumber?: number; fieldName?: string; message?: string }>;
+      }>("POST", "/api/import/empresas", { body: form });
+
+      const total = result?.totalRecords ?? 0;
+      const inserted = result?.inserted ?? 0;
+      const updated = result?.updated ?? 0;
+      const skipped = result?.skipped ?? 0;
+      const errors = result?.errors ?? [];
+
+      const summary = `Importacao concluida. Total: ${total}, Inseridos: ${inserted}, Atualizados: ${updated}, Ignorados: ${skipped}.`;
+      if (errors.length > 0) {
+        const first = errors[0];
+        setError(
+          `${summary} Primeiro erro: linha ${first.lineNumber ?? "?"}, campo ${first.fieldName ?? "?"} - ${first.message ?? "erro desconhecido"}.`,
+        );
+      } else {
+        setSuccessMessage(summary);
+      }
+
+      await invalidateEmpresas();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao importar empresas.");
+    } finally {
+      event.target.value = "";
+      setImportingCsv(false);
+    }
+  }
+
   async function handleGeocodeFromAddress() {
     const endereco = formData.endereco.trim();
     if (!endereco) {
@@ -357,6 +424,11 @@ export function EmpresasManagementScreen({ pendingEditId, onEditConsumed }: Empr
           onOpenCreateModal={handleOpenCreateModal}
           onRefresh={() => refetchEmpresas()}
           loadingList={loadingList}
+          onExportCsv={handleExportCsv}
+          onImportCsvClick={() => fileInputRef.current?.click()}
+          onImportCsvFileChange={handleImportCsvFile}
+          fileInputRef={fileInputRef}
+          importingCsv={importingCsv}
         />
 
         {(error || queryErrorMessage) && <p className="status-error">{error || queryErrorMessage}</p>}

@@ -141,6 +141,69 @@ function extractMessageFromBody(body: unknown): string | null {
 }
 
 /**
+ * Variante do apiFetch para endpoints binarios (ex.: download de CSV/PDF/imagem).
+ *
+ * Diferencas vs. apiFetch:
+ * - Retorna { blob, filename } em vez de tipo generico T.
+ * - SEMPRE injeta X-Api-Key se disponivel (mesmo em GET) — necessario para
+ *   downloads protegidos como `/api/import/<entidade>/exportar` que sao
+ *   admin-only.
+ * - Filename extraido do header `Content-Disposition` (RFC 6266); se ausente,
+ *   caller deve usar o fallback retornado (null).
+ */
+export async function apiFetchBlob(
+  method: "GET" | "POST",
+  path: string,
+  options: ApiFetchOptions = {},
+): Promise<{ blob: Blob; filename: string | null }> {
+  const { body, headers: extraHeaders, ...rest } = options;
+  const headers = new Headers(extraHeaders);
+
+  let finalBody: BodyInit | null | undefined;
+  if (body == null) {
+    finalBody = undefined;
+  } else if (body instanceof FormData || body instanceof Blob || typeof body === "string") {
+    finalBody = body;
+  } else {
+    headers.set("Content-Type", "application/json");
+    finalBody = JSON.stringify(body);
+  }
+
+  const sessionKey = getStoredApiKey();
+  if (sessionKey) {
+    headers.set("X-Api-Key", sessionKey);
+  }
+
+  const response = await fetch(apiUrl(path), { method, headers, body: finalBody, ...rest });
+
+  if (response.status === 401) {
+    notifyUnauthorized();
+  }
+
+  if (!response.ok) {
+    let errorBody: unknown = null;
+    const errorContentType = response.headers.get("content-type") ?? "";
+    try {
+      errorBody = errorContentType.includes("application/json") || errorContentType.includes("problem+json")
+        ? await response.json()
+        : await response.text();
+    } catch {
+      // body fica null se nao for parseable
+    }
+    const bodyMessage = extractMessageFromBody(errorBody);
+    const message = bodyMessage ?? `HTTP ${response.status} on ${method} ${path}`;
+    throw new ApiError(message, response.status, errorBody);
+  }
+
+  const blob = await response.blob();
+  const contentDisposition = response.headers.get("content-disposition") ?? "";
+  const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
+  const filename = filenameMatch?.[1] ?? null;
+
+  return { blob, filename };
+}
+
+/**
  * Erro tipado lancado pelo apiFetch em respostas !ok.
  * `status` HTTP + `body` raw (JSON parseado ou texto) ficam acessiveis pro caller
  * tratar casos especificos (ex.: 409 conflito vs 404 nao-encontrado).

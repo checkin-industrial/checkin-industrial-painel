@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { apiFetch, apiUrl, staticUrl, ApiError } from "./apiClient";
+import { apiFetch, apiFetchBlob, apiUrl, staticUrl, ApiError } from "./apiClient";
 
 // Importa a constante API_KEY indiretamente via comportamento.
 // Como import.meta.env.VITE_API_KEY nao tem valor em test env, X-Api-Key nao deve ser injetada.
@@ -95,5 +95,66 @@ describe("apiFetch", () => {
       expect(e).toBeInstanceOf(ApiError);
       expect((e as ApiError).status).toBe(401);
     }
+  });
+});
+
+describe("apiFetchBlob", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+  const STORAGE_KEY = "ci-admin-api-key";
+
+  beforeEach(() => {
+    sessionStorage.setItem(STORAGE_KEY, "test-key-123");
+    // jsdom Response nao aceita Blob no constructor; usamos string body
+    // (response.blob() ainda funciona pra extrair o conteudo).
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response("a,b,c\n1,2,3", {
+        status: 200,
+        headers: {
+          "Content-Type": "text/csv; charset=utf-8",
+          "Content-Disposition": `attachment; filename="empresas-utf8.csv"`,
+        },
+      }),
+    );
+  });
+
+  afterEach(() => {
+    fetchSpy?.mockRestore();
+    sessionStorage.removeItem(STORAGE_KEY);
+  });
+
+  it("injeta X-Api-Key em GET (necessario para endpoints admin de export)", async () => {
+    await apiFetchBlob("GET", "/api/import/empresas/exportar");
+    const init = fetchSpy.mock.calls[0]?.[1] as RequestInit | undefined;
+    const headers = init?.headers as Headers;
+    expect(headers.get("X-Api-Key")).toBe("test-key-123");
+  });
+
+  it("retorna blob + filename do Content-Disposition", async () => {
+    const result = await apiFetchBlob("GET", "/api/import/empresas/exportar");
+    // jsdom usa uma classe Blob distinta da global do node — checamos shape (size > 0 + type)
+    // ao inves de toBeInstanceOf(Blob) que comparava classes diferentes.
+    expect(typeof result.blob.size).toBe("number");
+    expect(result.blob.size).toBeGreaterThan(0);
+    expect(result.blob.type).toContain("text/csv");
+    expect(result.filename).toBe("empresas-utf8.csv");
+  });
+
+  it("retorna filename null quando Content-Disposition ausente", async () => {
+    fetchSpy.mockResolvedValueOnce(
+      new Response("x", {
+        status: 200,
+        headers: { "Content-Type": "text/csv" },
+      }),
+    );
+    const result = await apiFetchBlob("GET", "/api/import/empresas/exportar");
+    expect(result.filename).toBeNull();
+  });
+
+  it("lanca ApiError em 401 (admin nao autenticado)", async () => {
+    fetchSpy.mockResolvedValueOnce(new Response("Unauthorized", { status: 401 }));
+    await expect(apiFetchBlob("GET", "/api/import/empresas/exportar")).rejects.toMatchObject({
+      name: "ApiError",
+      status: 401,
+    });
   });
 });

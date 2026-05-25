@@ -1,3 +1,4 @@
+import type { ChangeEvent, RefObject } from "react";
 import type { StatusFiltro } from "../types";
 
 type EmpresasListToolbarProps = {
@@ -8,11 +9,19 @@ type EmpresasListToolbarProps = {
   onOpenCreateModal: () => void;
   onRefresh: () => void;
   loadingList: boolean;
+  // CSV: opcional pra manter componente reutilizavel em telas sem export
+  onExportCsv?: (ansi: boolean) => void;
+  onImportCsvClick?: () => void;
+  onImportCsvFileChange?: (event: ChangeEvent<HTMLInputElement>) => void;
+  fileInputRef?: RefObject<HTMLInputElement | null>;
+  importingCsv?: boolean;
 };
 
 // Barra superior da lista admin: busca livre, filtro de status, botoes
 // "Nova Empresa" e "Atualizar". Sem estado proprio - tudo controlado pelo
-// container.
+// container. Os botoes de CSV (Exportar/Importar) aparecem so quando os
+// handlers correspondentes sao passados (gracefully degrada em testes/screens
+// que nao precisam).
 export function EmpresasListToolbar({
   searchTerm,
   onSearchTermChange,
@@ -21,7 +30,14 @@ export function EmpresasListToolbar({
   onOpenCreateModal,
   onRefresh,
   loadingList,
+  onExportCsv,
+  onImportCsvClick,
+  onImportCsvFileChange,
+  fileInputRef,
+  importingCsv = false,
 }: EmpresasListToolbarProps) {
+  const csvEnabled = Boolean(onExportCsv && onImportCsvClick && onImportCsvFileChange);
+
   return (
     <div className="company-list-toolbar">
       <input
@@ -52,6 +68,32 @@ export function EmpresasListToolbar({
       >
         {loadingList ? "Atualizando..." : "Atualizar"}
       </button>
+      {csvEnabled && (
+        <>
+          <button type="button" className="ghost btn-with-icon" onClick={() => onExportCsv?.(false)}>
+            Exportar CSV
+          </button>
+          <button type="button" className="ghost btn-with-icon" onClick={() => onExportCsv?.(true)}>
+            Exportar CSV ANSI
+          </button>
+          <button
+            type="button"
+            className="ghost btn-with-icon"
+            onClick={onImportCsvClick}
+            disabled={importingCsv}
+          >
+            {importingCsv ? "Importando..." : "Importar CSV"}
+          </button>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={onImportCsvFileChange}
+            style={{ display: "none" }}
+            aria-label="Selecionar arquivo CSV de empresas"
+          />
+        </>
+      )}
     </div>
   );
 }

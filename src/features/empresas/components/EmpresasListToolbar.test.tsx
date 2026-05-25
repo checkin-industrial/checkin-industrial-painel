@@ -59,4 +59,41 @@ describe("EmpresasListToolbar (smoke)", () => {
     const refreshButton = screen.getByRole("button", { name: /Atualizando/i });
     expect(refreshButton).toBeDisabled();
   });
+
+  it("sem handlers de CSV, os botoes de Export/Import NAO renderizam", () => {
+    setup();
+    expect(screen.queryByRole("button", { name: /Exportar CSV/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Importar CSV/i })).not.toBeInTheDocument();
+  });
+
+  it("com handlers de CSV, renderiza os 3 botoes (Exportar UTF-8 + ANSI + Importar)", () => {
+    const onExportCsv = vi.fn();
+    const onImportCsvClick = vi.fn();
+    const onImportCsvFileChange = vi.fn();
+    setup({ onExportCsv, onImportCsvClick, onImportCsvFileChange });
+
+    expect(screen.getByRole("button", { name: /^Exportar CSV$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Exportar CSV ANSI/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Importar CSV$/i })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /^Exportar CSV$/i }));
+    expect(onExportCsv).toHaveBeenCalledWith(false);
+
+    fireEvent.click(screen.getByRole("button", { name: /Exportar CSV ANSI/i }));
+    expect(onExportCsv).toHaveBeenLastCalledWith(true);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Importar CSV$/i }));
+    expect(onImportCsvClick).toHaveBeenCalledOnce();
+  });
+
+  it("durante importingCsv, botao Importar fica desabilitado com label 'Importando...'", () => {
+    setup({
+      onExportCsv: vi.fn(),
+      onImportCsvClick: vi.fn(),
+      onImportCsvFileChange: vi.fn(),
+      importingCsv: true,
+    });
+    const btn = screen.getByRole("button", { name: /Importando/i });
+    expect(btn).toBeDisabled();
+  });
 });

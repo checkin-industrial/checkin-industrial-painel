@@ -1,6 +1,7 @@
 import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { apiFetch, apiUrl } from "../../shared/api/apiClient";
+import { apiFetch, apiFetchBlob } from "../../shared/api/apiClient";
+import { triggerBlobDownload } from "../../shared/utils/downloadBlob";
 import { PontoInstitucionalFormModal } from "./components/PontoInstitucionalFormModal";
 import { PontoInstitucionalListToolbar } from "./components/PontoInstitucionalListToolbar";
 import { PontoInstitucionalTable } from "./components/PontoInstitucionalTable";
@@ -307,26 +308,9 @@ export function PontosInstitucionaisManagementScreen() {
       const endpoint = ansi
         ? "/api/import/pontos-institucionais/exportar-ansi"
         : "/api/import/pontos-institucionais/exportar";
-      const response = await fetch(apiUrl(endpoint));
-
-      if (!response.ok) {
-        throw new Error(`Falha ao exportar CSV (${response.status})`);
-      }
-
-      const blob = await response.blob();
-      const contentDisposition = response.headers.get("content-disposition") ?? "";
-      const fileNameMatch = contentDisposition.match(/filename="?([^";]+)"?/i);
-      const fileName = fileNameMatch?.[1] ?? `pontos-institucionais-${ansi ? "ansi" : "utf8"}.csv`;
-
-      const url = URL.createObjectURL(blob);
-      const anchor = document.createElement("a");
-      anchor.href = url;
-      anchor.download = fileName;
-      document.body.appendChild(anchor);
-      anchor.click();
-      anchor.remove();
-      URL.revokeObjectURL(url);
-
+      const { blob, filename } = await apiFetchBlob("GET", endpoint);
+      const fallback = `pontos-institucionais-${ansi ? "ansi" : "utf8"}.csv`;
+      triggerBlobDownload(blob, filename ?? fallback);
       setSuccessMessage("Exportacao de pontos institucionais concluida.");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao exportar pontos institucionais.");
