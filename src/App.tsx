@@ -40,6 +40,11 @@ const TelefonesUteisCardsScreen = lazy(() =>
     default: mod.TelefonesUteisCardsScreen,
   })),
 );
+const TriagemImportacoesScreen = lazy(() =>
+  import("./features/triagem/TriagemImportacoesScreen").then((mod) => ({
+    default: mod.TriagemImportacoesScreen,
+  })),
+);
 const TelefonesUteisManagementScreen = lazy(() =>
   import("./features/telefonesUteis/TelefonesUteisManagementScreen").then((mod) => ({
     default: mod.TelefonesUteisManagementScreen,
@@ -50,9 +55,9 @@ function TabFallback() {
   return <div className="page-loading">Carregando…</div>;
 }
 
-type DashboardTab = "mapa" | "gestao" | "gestao-pontos" | "cards-pontos" | "cards-telefones" | "gestao-telefones" | "import-google-maps";
+type DashboardTab = "mapa" | "gestao" | "gestao-pontos" | "cards-pontos" | "cards-telefones" | "gestao-telefones" | "import-google-maps" | "triagem-importacoes";
 
-const ADMIN_TABS: DashboardTab[] = ["gestao", "gestao-pontos", "gestao-telefones", "import-google-maps"];
+const ADMIN_TABS: DashboardTab[] = ["gestao", "gestao-pontos", "gestao-telefones", "import-google-maps", "triagem-importacoes"];
 
 function isAdminTab(tab: DashboardTab): boolean {
   return ADMIN_TABS.includes(tab);
@@ -253,6 +258,14 @@ export function App() {
                 >
                   Importar do Google Maps
                 </button>
+                <button
+                  type="button"
+                  className={activeTab === "triagem-importacoes" ? "top-submenu-link active" : "top-submenu-link"}
+                  role="menuitem"
+                  onClick={() => handleNavigate("triagem-importacoes")}
+                >
+                  Triagem de Importações
+                </button>
                 {isAuthenticated && (
                   <button
                     type="button"
@@ -288,7 +301,8 @@ export function App() {
           {activeTab === "cards-pontos" && <PontosInstitucionaisCardsScreen onRouteToPoint={handleRouteToPointFromCards} />}
           {activeTab === "cards-telefones" && <TelefonesUteisCardsScreen />}
           {activeTab === "gestao-telefones" && <TelefonesUteisManagementScreen />}
-          {activeTab === "import-google-maps" && <GoogleMapsImportScreen onGoToManagement={() => setActiveTab("gestao")} />}
+          {activeTab === "import-google-maps" && <GoogleMapsImportScreen onGoToTriagem={() => setActiveTab("triagem-importacoes")} />}
+          {activeTab === "triagem-importacoes" && <TriagemImportacoesScreen />}
         </Suspense>
       </main>
 

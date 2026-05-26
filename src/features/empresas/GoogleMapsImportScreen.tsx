@@ -23,16 +23,20 @@ type ImportResultItem = {
   googlePlaceId: string;
   nome: string;
   acao: "criado" | "atualizado" | "ignorado";
-  empresaId?: string;
+  candidateId?: string;
   motivo?: string;
 };
 
+// Response do POST /import/google-maps. Mudou semanticamente: agora cria
+// CANDIDATES (entidade de triagem) em vez de Empresas direto. Admin promove
+// individualmente cada candidato pra Empresa/Ponto/Telefone (ou rejeita)
+// na tela "Triagem de Importações".
 type ImportResult = {
   operacaoId: string;
   encontrados: number;
-  criados: number;
-  atualizados: number;
-  ignorados: number;
+  candidatesCriados: number;
+  candidatesAtualizados: number;
+  candidatesIgnorados: number;
   itens: ImportResultItem[];
 };
 
@@ -41,10 +45,10 @@ function sanitizeDigits(value: string) {
 }
 
 type GoogleMapsImportScreenProps = {
-  onGoToManagement?: () => void;
+  onGoToTriagem?: () => void;
 };
 
-export function GoogleMapsImportScreen({ onGoToManagement }: GoogleMapsImportScreenProps) {
+export function GoogleMapsImportScreen({ onGoToTriagem }: GoogleMapsImportScreenProps) {
   const queryClient = useQueryClient();
   const [cep, setCep] = useState("");
   const [raioMetros, setRaioMetros] = useState(800);
@@ -70,9 +74,10 @@ export function GoogleMapsImportScreen({ onGoToManagement }: GoogleMapsImportScr
         body: { cep: cepLimpo, raioMetros, tipo },
       });
       setResult(data);
-      // Invalida cache de empresas pra Management Screen refletir as novas linhas
-      // assim que o admin clicar em "Ir para revisar".
-      queryClient.invalidateQueries({ queryKey: ["empresas"] });
+      // Invalida cache da Triagem pra refletir os novos candidates no proximo
+      // load da tela. Empresas/Pontos/Telefones nao mudam (a criacao acontece
+      // so depois que o admin promover via Triagem).
+      queryClient.invalidateQueries({ queryKey: ["import-candidates"] });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao importar via Google Maps.");
     } finally {
@@ -85,9 +90,10 @@ export function GoogleMapsImportScreen({ onGoToManagement }: GoogleMapsImportScr
       <header className="section-header">
         <h2>Importar Empresas do Google Maps</h2>
         <p className="section-description">
-          Busca empresas via Google Places no raio especificado e cadastra cada uma com
-          status <strong>Aguardando revisão</strong>. Revise os cadastros antes de aprovar
-          (botão <em>Aprovar</em> em Gestão de Empresas).
+          Busca lugares via Google Places no raio especificado e cria
+          <strong> candidatos de triagem</strong>. Na tela <em>Triagem de Importações</em>,
+          revise cada candidato e decida individualmente se vira Empresa, Ponto
+          Institucional, Telefone Útil — ou rejeite.
         </p>
       </header>
 
@@ -144,15 +150,15 @@ export function GoogleMapsImportScreen({ onGoToManagement }: GoogleMapsImportScr
         <section className="google-maps-import-result">
           <h3>Resultado da importação</h3>
           <p>
-            <strong>{result.encontrados}</strong> empresa(s) encontrada(s) —{" "}
-            <strong>{result.criados}</strong> criada(s),{" "}
-            <strong>{result.atualizados}</strong> atualizada(s),{" "}
-            <strong>{result.ignorados}</strong> ignorada(s).
+            <strong>{result.encontrados}</strong> lugar(es) encontrado(s) —{" "}
+            <strong>{result.candidatesCriados}</strong> candidato(s) novo(s),{" "}
+            <strong>{result.candidatesAtualizados}</strong> atualizado(s),{" "}
+            <strong>{result.candidatesIgnorados}</strong> ignorado(s).
           </p>
 
-          {onGoToManagement && result.criados > 0 && (
-            <button type="button" className="btn-with-icon btn-action-reactivate" onClick={onGoToManagement}>
-              Ir para revisar empresas aguardando aprovação
+          {onGoToTriagem && (result.candidatesCriados > 0 || result.candidatesAtualizados > 0) && (
+            <button type="button" className="btn-with-icon btn-action-reactivate" onClick={onGoToTriagem}>
+              Ir para triagem dos candidatos
             </button>
           )}
 
